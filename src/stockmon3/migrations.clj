@@ -12,6 +12,7 @@
 
 ; applying the migrations
 (comment 
+ (require 'stockmon3.migrations)
  (ns stockmon3.migrations)
  (require '[ragtime.repl :as repl])
  (repl/migrate|rollback config)
