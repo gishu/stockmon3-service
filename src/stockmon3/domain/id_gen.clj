@@ -3,18 +3,23 @@
             [next.jdbc.result-set :as jdbc-rs]
             [stockmon3.config.db :as config]))
 
+;; map [:entity => {:next_id, :reserved_max}]
 (def id-map (atom {}))
+
+;;TODO Duplication
+;; make jdbc.next return simple maps
 (def as-simple-maps {:builder-fn jdbc-rs/as-unqualified-lower-maps})
 
 (defn- update-id-map [oldVal entity next-id res-max]
-  (assoc oldVal entity {:next-id next-id, :reserved-max res-max})
-  )
+  (assoc oldVal entity {:next-id next-id, :reserved-max res-max}))
 
-(defn get-next-id 
+(defn get-next-id
+  "Generates unique ids for `entities` to be persisted to the DB. 
+   Grabs the next available id from the keys table. 
+   Use `buffer-size` to cache N ids to reduce DB hits"
+
   [entity buffer-size]
-  
-  "Generates unique ids for entities to be persisted to the DB. Grabs the next available id from the keys table. Use `buffer-size` to cache N ids to reduce DB hits"
-  
+
   (let [{{:keys [next-id reserved-max]} entity} @id-map]
 
     ;; load from DB - reserve buffer-size ids
@@ -44,5 +49,10 @@
   (let [{{:keys [next-id reserved-max]} entity} @id-map]
     (swap! id-map update-id-map entity (inc next-id) reserved-max)
     next-id))
-  
 
+
+;; for testing, inject a mock generator e.g. see id_gen_mock)
+(def next-id "function to get next id" (atom get-next-id))
+
+(defn set-id-generator [fn]
+  (reset! next-id fn))

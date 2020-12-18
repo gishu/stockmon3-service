@@ -1,0 +1,1 @@
+CREATE TABLE st3.accounts (id int PRIMARY KEY, name varchar(20), description varchar(30));

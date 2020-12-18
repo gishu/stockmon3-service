@@ -1,6 +1,7 @@
 (ns stockmon3.migrations
   (:require [ragtime.jdbc :as jdbc]))
 
+;;TODO remove this duplication
 (def config
   {:datastore (jdbc/sql-database {:dbtype "postgresql"
                                   :dbname "st3"
