@@ -11,4 +11,6 @@
   :plugins [[lein-environ "1.2.0"]]
   :main ^:skip-aot stockmon3.core
   :target-path "target/%s"
-  :profiles {:uberjar {:aot :all}})
+  :profiles {:uberjar {:aot :all}}
+  :test-selectors {:default (complement :integration)
+                   :integration :integration})

@@ -1,4 +1,4 @@
-(ns stockmon3.account-test
+(ns stockmon3.db.account-test
   (:require [clojure.test :refer :all]
             [stockmon3.migrations :refer [config]]
             [ragtime.repl :as repl]
@@ -14,17 +14,14 @@
 (use-fixtures :each db-fixture)
 
 (defn setup-db []
-  (println "Init db")
-  (repl/migrate config)
-  )
+  (repl/migrate config))
 
 (defn teardown-db []
-  (println "Reset db")
   
   (let [total-migrations (-> config :migrations count)]
     (repl/rollback config total-migrations)))
 
-(deftest persistence 
+(deftest ^:integration persistence 
   (testing "Accounts can be created and persisted"
   (let [name "TestUser" desc "mera demat account"
         account (make-account name desc)
