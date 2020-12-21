@@ -1,14 +1,9 @@
 (ns stockmon3.migrations
-  (:require [ragtime.jdbc :as jdbc]))
+  (:require [ragtime.jdbc :as jdbc]
+            [stockmon3.config.db :as dbconfig]))
 
-;;TODO remove this duplication
 (def config
-  {:datastore (jdbc/sql-database {:dbtype "postgresql"
-                                  :dbname "st3"
-                                  :host "localhost"
-                                  :port 5432
-                                  :user "gishu"
-                                  :password "pwd-101"})
+  {:datastore (jdbc/sql-database (dbconfig/get-db-info))
    :migrations (jdbc/load-resources "migrations")})
 
 ; applying the migrations

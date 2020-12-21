@@ -7,6 +7,7 @@
 (defn get-db-conn
   []
   (let [ds (jdbc/get-datasource (config/get-db-info))
+        ;; get simple maps as result from sql queries
         ds-opts (jdbc/with-options ds {:builder-fn jdbc-rs/as-unqualified-lower-maps})]
     ds-opts))
 

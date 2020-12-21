@@ -1,14 +1,9 @@
 (ns stockmon3.domain.id-gen
-  (:require [next.jdbc :as jdbc]
-            [next.jdbc.result-set :as jdbc-rs]
-            [stockmon3.config.db :as config]))
+  (:require [stockmon3.db.conn :refer [get-db-conn]]
+            [next.jdbc.sql :as sql]))
 
 ;; map [:entity => {:next_id, :reserved_max}]
 (def id-map (atom {}))
-
-;;TODO Duplication
-;; make jdbc.next return simple maps
-(def as-simple-maps {:builder-fn jdbc-rs/as-unqualified-lower-maps})
 
 (defn- update-id-map [oldVal entity next-id res-max]
   (assoc oldVal entity {:next-id next-id, :reserved-max res-max}))
@@ -26,23 +21,17 @@
     ;; if this is first call for entity type OR ids have been exhausted
     (when (or (nil? (entity @id-map))
               (> next-id reserved-max))
-      (let [ds (jdbc/get-datasource (config/get-db-info))
+      (let [ds (get-db-conn)
             entity-name (name entity)]
 
         (let [rs
-              (jdbc/execute-one!
-               ds
-               ["SELECT next_id from st3.keys where entity = ?" entity-name]
-               as-simple-maps)
+              (sql/get-by-id ds :st3.keys entity-name :entity {})
               db-next-id (:next_id rs)]
           (if (nil? db-next-id)
             (throw (Exception. (str "Unknown entity type " entity-name))))
 
           (let [db-res-max (+ db-next-id (dec buffer-size))]
-
-            (jdbc/execute-one! ds
-                               ["UPDATE st3.keys SET next_id = ? where entity = ?" (inc db-res-max) entity-name])
-
+            (sql/update! ds :st3.keys {:next_id (inc db-res-max)} {:entity entity-name})
             (swap! id-map update-id-map entity db-next-id db-res-max))))))
 
   ;; get next available id
