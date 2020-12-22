@@ -38,10 +38,3 @@
   (let [{{:keys [next-id reserved-max]} entity} @id-map]
     (swap! id-map update-id-map entity (inc next-id) reserved-max)
     next-id))
-
-
-;; for testing, inject a mock generator e.g. see id_gen_mock)
-(def next-id "function to get next id" (atom get-next-id))
-
-(defn set-id-generator [fn]
-  (reset! next-id fn))

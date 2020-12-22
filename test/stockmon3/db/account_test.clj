@@ -29,8 +29,7 @@
     (save-account account)
     
     (let [loaded (load-account created-id)]
-      (is (= name (:name loaded)) "- incorrect account.name!")
-      (is (= desc (:description loaded)) "- incorrect account.description!")
+      (is (= account (dissoc loaded :created_at)) "loaded account doesn't match the saved one")
       )
     
     ))
