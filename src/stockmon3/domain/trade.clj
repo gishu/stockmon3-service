@@ -4,21 +4,29 @@
             [stockmon3.db.conn :refer [get-db-conn]]
             [next.jdbc [sql :as sql]
              date-time]  ; required to recognize java.time.* types as SQL timestamps
+            [clojurewerkz.money.amounts :as money]
+            [clojurewerkz.money.currencies :as curr]
             [clojure.set :refer [rename-keys]])   
   (:import [java.time LocalDate Instant]))
 
 (defrecord Trade [id date type stock qty price account-id])
 
-(defn make-trade [date type stock qty price account-id]
+(defn make-trade [date type stock qty price currency account-id]
   (->Trade (get-next-id :trade 3) 
            (LocalDate/parse date)
            (if (= "S" type) type "B")
-           stock qty price account-id))
+           stock qty 
+           (money/amount-of (curr/of currency) price)
+           account-id))
 
 (defn save-trade [trade]
-  (let [row (-> trade
+  (let [amount (:price trade)
+        row (-> trade
                 (rename-keys {:date :trade_date :account-id :account_id})
-                (assoc :created_at (Instant/now)))]
+                (dissoc :price)
+                (assoc :created_at (Instant/now)
+                       :price (-> amount .getAmount .doubleValue)
+                       :currency (-> amount .getCurrencyUnit .toString)))]
   
     (sql/insert! (get-db-conn) :st3.trades row)))
 
@@ -40,6 +48,11 @@
 
   (->> (sql/find-by-keys (get-db-conn) :st3.trades {:account_id account-id})
        (map (fn [map]   ; rename trade_date to date
-              (rename-keys map {:trade_date :date :account_id :account-id})))
+              (let [{:keys [price currency]} map]
+                
+                (-> map
+                    (dissoc :currency)
+                    (assoc :price (money/amount-of (curr/of currency) price) )
+                    (rename-keys {:trade_date :date :account_id :account-id})))))
        (map mapSqlToTimeTypes)
        (map map->Trade)))

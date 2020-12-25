@@ -15,7 +15,7 @@
                     save-trade (fn [t] (reset! mock {:trade t}))]
 
         (let [acc (make-account "Knuckleheads" "Fargo account")
-              trade (make-trade "2020-12-22" "B" "HDFC" 100 2350.0 (:id acc))]
+              trade (make-trade "2020-12-22" "B" "HDFC" 100 2350.0 "INR" (:id acc))]
           (buy acc trade)
 
           (is (= "HDFC" (get-in @mock [:trade :stock])) "save-trade not called with correct details"))))))

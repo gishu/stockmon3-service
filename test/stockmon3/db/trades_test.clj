@@ -29,7 +29,7 @@
     (let [name "TestUser" desc "mera demat account"
           account (make-account name desc)
           created-id (:id account)
-          trade (make-trade "2020-12-22" "B" "MGL" 100 "825" created-id)]
+          trade (make-trade "2020-12-22" "B" "MGL" 100 825 "INR" created-id)]
       (save-account account)
 
       (save-trade trade)
