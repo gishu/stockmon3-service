@@ -4,9 +4,8 @@
             [stockmon3.db.conn :refer [get-db-conn]]
             [next.jdbc [sql :as sql]
              date-time]  ; required to recognize java.time.* types as SQL timestamps
-            [clojurewerkz.money.amounts :as money]
-            [clojurewerkz.money.currencies :as curr]
-            [clojure.set :refer [rename-keys]])   
+            [clojure.set :refer [rename-keys]]
+            [stockmon3.domain.utils :refer [make-money]])   
   (:import [java.time LocalDate Instant]))
 
 (defrecord Trade [id date type stock qty price account-id])
@@ -16,7 +15,7 @@
            (LocalDate/parse date)
            (if (= "S" type) type "B")
            stock qty 
-           (money/amount-of (curr/of currency) price)
+           (make-money price currency)
            account-id))
 
 (defn save-trade [trade]
@@ -52,7 +51,7 @@
                 
                 (-> map
                     (dissoc :currency)
-                    (assoc :price (money/amount-of (curr/of currency) price) )
+                    (assoc :price (make-money price currency))
                     (rename-keys {:trade_date :date :account_id :account-id})))))
        (map mapSqlToTimeTypes)
        (map map->Trade)))

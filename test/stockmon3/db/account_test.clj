@@ -21,7 +21,7 @@
   (let [total-migrations (-> config :migrations count)]
     (repl/rollback config total-migrations)))
 
-(deftest ^:integration persistence 
+(deftest ^:integration new-account-persistence 
   (testing "Accounts can be created and persisted"
   (let [name "TestUser" desc "mera demat account"
         account (make-account name desc)
@@ -29,7 +29,8 @@
     (save-account account)
     
     (let [loaded (load-account created-id)]
-      (is (= account (dissoc loaded :created_at)) "loaded account doesn't match the saved one")
+      (is (= (dissoc account :holdings) 
+             (dissoc loaded :created_at :holdings)) "loaded account doesn't match the saved one")
       )
     
     ))
@@ -48,3 +49,6 @@
       )
     )
   )
+
+;;TODO - load holdings map from db
+(deftest ^:integration account-with-trades-persistence)
