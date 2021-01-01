@@ -3,7 +3,7 @@
    [clojure.test :refer :all]
    [stockmon3.domain.id-gen :as id-gen]
    [stockmon3.id-gen-mock :as mock]
-   [stockmon3.domain [account :refer [make-account buy get-holdings]] 
+   [stockmon3.domain [account :refer [make-account buy sell get-holdings]] 
     [trade :refer [make-trade save-trade]]]
    [stockmon3.domain.utils :refer [make-money]]
    ))
@@ -30,7 +30,8 @@
       (let [acc (make-account "customer" "yada")
             acc-id (:id acc)
             trade1 (make-trade "2020-12-01" "B" "HDFC" 10 1100 "INR" acc-id)
-            trade2 (make-trade "2020-12-12" "B" "HDFC" 20 1000 "INR" acc-id)]
+            trade2 (make-trade "2020-12-12" "B" "HDFC" 20 1000 "INR" acc-id)
+            trade3 (make-trade "2020-12-20" "S" "HDFC" 5 1400 "INR" acc-id)]
 
         (testing "single holding"
           (buy acc trade1)
@@ -42,12 +43,24 @@
                    (select-keys holdings [:total-qty :avg-price]))
                 "- should have held 10 HDFC@1100")))
 
-        (testing "report merged holdings"
+        (testing "report merged holdings after multiple buys"
           (buy acc trade2)
 
           (let [holdings (-> acc get-holdings (get "HDFC"))]
- 
+            
             (is (= {:total-qty 30 :avg-price (make-money 1033.33 "INR")}
                    (select-keys holdings [:total-qty :avg-price]))
-                "- should have held 30 HDFC@1033.33")))))) 
-  
+                "- should have held 30 HDFC@1033.33")))
+        
+        
+        
+        (testing "deduct holdings on a sale"
+          (sell acc trade3)
+          
+          (let [holdings (-> acc get-holdings (get "HDFC"))]
+            
+            (is (= {:total-qty 25 :avg-price (make-money 1020 "INR")}
+                   (select-keys holdings [:total-qty :avg-price]))
+                "- should have held 25 HDFC@1020"))
+          
+          ))))
