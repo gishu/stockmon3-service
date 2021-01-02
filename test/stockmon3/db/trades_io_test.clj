@@ -1,9 +1,10 @@
-(ns stockmon3.db.trades-test
+(ns stockmon3.db.trades-io-test
   (:require [clojure.test :refer :all]
             [ragtime.repl :as repl]
+            [stockmon3.db [account-io :refer [save-account]]
+             [trade-io :refer [save-trade get-trades-for-account]]]
             [stockmon3.domain [account :refer :all]
-             [account-io :refer [save-account]]
-             [trade :refer :all]]
+             [trade :refer [make-trade]]]
             [stockmon3.migrations :refer [config]]))
 
 (declare setup-db teardown-db)

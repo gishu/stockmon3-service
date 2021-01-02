@@ -1,7 +1,8 @@
 (ns stockmon3.accounts-trade-test
   (:require [clojure.test :refer :all]
+            [stockmon3.db.trade-io :refer [save-trade]]
             [stockmon3.domain [account :refer [make-account buy sell get-holdings]]
-             [trade :refer [make-trade save-trade]]]
+             [trade :refer [make-trade]]]
             [stockmon3.domain.id-gen :as id-gen]
             [stockmon3.id-gen-mock :as mock]
             [stockmon3.utils :refer [make-money]]))

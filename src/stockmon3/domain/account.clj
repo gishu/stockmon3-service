@@ -1,7 +1,7 @@
 (ns stockmon3.domain.account
   (:require [clojurewerkz.money.amounts :as money]
-            [stockmon3.domain.id-gen :refer [get-next-id]]
-            [stockmon3.domain.trade :refer [save-trade]]))
+            [stockmon3.db.trade-io :refer [save-trade]]
+            [stockmon3.domain.id-gen :refer [get-next-id]]))
 
 (defrecord Account [id name description holdings])
 

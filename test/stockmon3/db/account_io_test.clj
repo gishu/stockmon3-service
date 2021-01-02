@@ -1,8 +1,8 @@
 (ns stockmon3.db.account-io-test
   (:require [clojure.test :refer :all]
             [ragtime.repl :as repl]
+            [stockmon3.db.account-io :refer [save-account load-account]]
             [stockmon3.domain.account :refer [make-account get-holdings buy sell]]
-            [stockmon3.domain.account-io :refer [save-account load-account]]
             [stockmon3.domain.trade :refer [make-trade]]
             [stockmon3.migrations :refer [config]]
             [stockmon3.utils :refer [make-money]]))

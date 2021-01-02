@@ -1,10 +1,10 @@
-(ns stockmon3.domain.account-io
+(ns stockmon3.db.account-io
   (:require [clojure.set :refer [rename-keys difference]]
             [next.jdbc :as jdbc]
             [next.jdbc [sql :as sql] date-time]
             [stockmon3.db.conn :refer [get-db-conn]]
-            [stockmon3.domain.account :refer [map->Account get-holdings get-average-stats]]
-            [stockmon3.domain.trade :refer [map->Trades]])
+            [stockmon3.db.trade-io :refer [map->Trades]]
+            [stockmon3.domain.account :refer [map->Account get-holdings get-average-stats]])
   (:import java.time.Instant))
 
 (declare save-holdings)
