@@ -1,10 +1,7 @@
 (ns stockmon3.domain.account
-  (:require [stockmon3.domain.id-gen :refer [get-next-id]] 
-            [stockmon3.db.conn :refer [get-db-conn]]
-            [stockmon3.domain.trade :refer [save-trade]]
-            [clojurewerkz.money.amounts :as money]
-            [next.jdbc [sql :as sql] date-time])
-  (:import java.time.Instant))
+  (:require [clojurewerkz.money.amounts :as money]
+            [stockmon3.domain.id-gen :refer [get-next-id]]
+            [stockmon3.domain.trade :refer [save-trade]]))
 
 (defrecord Account [id name description holdings])
 
@@ -15,25 +12,6 @@
   
   (->Account (get-next-id :account 1) name description (atom {})))
 
-(defn save-account [an-account]
-  (if (:created_at an-account)
-    
-    (sql/update! (get-db-conn) :st3.accounts 
-                 (select-keys an-account [:name :description]) 
-                 {:id (:id an-account)})
-    (sql/insert! (get-db-conn) :st3.accounts 
-                 (-> (select-keys an-account [:id :name :description])
-                     (assoc :created_at (Instant/now)))))
-  )
-
-(defn load-account [id]
-  (let [row  (sql/get-by-id (get-db-conn) :st3.accounts id)]
-    (when row
-      (let [created-at (:created_at row)]
-        (-> row
-            (assoc :holdings (atom {}))
-            map->Account
-            (assoc :created_at (.toInstant created-at)))))))
 
 (defn get-holdings [account]
   @(:holdings account))
@@ -41,15 +19,17 @@
 (declare add deduct)
 (defn buy [account trade]
   (save-trade trade)
-  (swap! (:holdings account) add trade))
+  (swap! (:holdings account) add trade)
+  account)
 
 (defn sell [account trade]
   ;; TODO: no holding BOOM!
   ;; TODO: not enough holdings for sale
   (save-trade trade)
-  (swap! (:holdings account) deduct trade))
+  (swap! (:holdings account) deduct trade)
+  account)
 
-(defn- get-average-stats [trades]
+(defn get-average-stats [trades]
   (let [monies (money/total (map #(money/multiply (:price %) (:rem-qty %)) trades))
         total-qty (reduce #(+ %1 (:rem-qty %2)) 0 trades)]
     [total-qty
@@ -78,13 +58,13 @@
      (let [[mapped-x new-state] (func x state)]
        (cons mapped-x (map-with-state func new-state xs))))))
 
-(defn- realize-sale [buy-trade sale-qty]
+(defn- fifo-match-sale [buy-trade sale-qty]
   (if (> sale-qty 0)
 
     (let [held-qty (:rem-qty buy-trade)
           gain-qty (min sale-qty held-qty)
-          updated-trade (assoc buy-trade :rem-qty (- held-qty gain-qty))]
-      (println "Logging gain for " gain-qty " against buy#" (:id buy-trade))
+          updated-trade (assoc buy-trade :rem-qty (- held-qty gain-qty) :modified true)]
+
       [updated-trade, (- sale-qty gain-qty)])
     [buy-trade, 0]))
   
@@ -94,7 +74,9 @@
         holding  (get holdings stock)]
     
 
-    (let [updated-trades (map-with-state realize-sale sale-qty (:buys holding))
+    (let [updated-trades (map-with-state fifo-match-sale sale-qty (:buys holding))
+          ; remove holdings with 0 qty remaining
+          updated-trades (filter #(> (:rem-qty %) 0) updated-trades)
           [total-qty, avg-price] (get-average-stats updated-trades)]
 
       (assoc holdings stock {:total-qty total-qty, :avg-price avg-price, :buys updated-trades}))))

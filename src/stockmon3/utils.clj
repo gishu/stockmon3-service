@@ -1,4 +1,4 @@
-(ns stockmon3.domain.utils
+(ns stockmon3.utils
   (:require
    [clojurewerkz.money.amounts :as money]
    [clojurewerkz.money.currencies :as curr]))

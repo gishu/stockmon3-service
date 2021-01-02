@@ -1,11 +1,11 @@
 (ns stockmon3.domain.trade
 
-  (:require [stockmon3.domain.id-gen :refer [get-next-id]]
-            [stockmon3.db.conn :refer [get-db-conn]]
+  (:require [clojure.set :refer [rename-keys]]
             [next.jdbc [sql :as sql]
-             date-time]  ; required to recognize java.time.* types as SQL timestamps
-            [clojure.set :refer [rename-keys]]
-            [stockmon3.domain.utils :refer [make-money]])   
+             date-time] ;reqd to recognize java.time.* types as SQL timestamps
+            [stockmon3.db.conn :refer [get-db-conn]]
+            [stockmon3.domain.id-gen :refer [get-next-id]]
+            [stockmon3.utils :refer [make-money]])   
   (:import [java.time LocalDate Instant]))
 
 (defrecord Trade [id date type stock qty price account-id])
@@ -43,13 +43,26 @@
           {} 
           map-with-sql-types))
 
+(defn map->Trades [rows]
+  (->> rows
+       (map (fn [attr-map]   ; rename trade_date to date
+              (let [{:keys [price currency]} attr-map]
+
+                (-> attr-map
+                    (dissoc :currency)
+                    (assoc :price (make-money price currency))
+                    (rename-keys {:trade_date :date :account_id :account-id})))))
+       (map mapSqlToTimeTypes)
+       (map map->Trade))
+  )
+
 (defn get-trades-for-account [account-id]
 
   (->> (sql/find-by-keys (get-db-conn) :st3.trades {:account_id account-id})
-       (map (fn [map]   ; rename trade_date to date
-              (let [{:keys [price currency]} map]
+       (map (fn [attr-map]   ; rename trade_date to date
+              (let [{:keys [price currency]} attr-map]
                 
-                (-> map
+                (-> attr-map
                     (dissoc :currency)
                     (assoc :price (make-money price currency))
                     (rename-keys {:trade_date :date :account_id :account-id})))))
