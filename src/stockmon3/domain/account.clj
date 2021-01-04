@@ -29,13 +29,13 @@
   (swap! (:holdings account) deduct trade)
   account)
 
-(defn get-average-stats [trades]
-  (let [monies (money/total (map #(money/multiply (:price %) (:rem-qty %)) trades))
-        total-qty (reduce #(+ %1 (:rem-qty %2)) 0 trades)]
-    [total-qty
-     (money/divide monies total-qty :floor)]
-    )
-  )
+(defn get-average-stats [holdings]
+  (let [total-qty (reduce #(+ %1 (:rem-qty %2)) 0 holdings)]
+    (if (= 0 total-qty)
+      [0 money/zero]
+      (let [monies (money/total (map #(money/multiply (:price %) (:rem-qty %)) holdings))]
+        [total-qty
+         (money/divide monies total-qty :floor)]))))
 
 (defn- add [holdings trade]
   (let [{:keys [stock qty price]} trade

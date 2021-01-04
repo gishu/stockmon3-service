@@ -5,21 +5,31 @@
              [trade :refer [make-trade]]]
             [stockmon3.domain.id-gen :as id-gen]
             [stockmon3.id-gen-mock :as mock]
-            [stockmon3.utils :refer [make-money]]))
+            [stockmon3.utils :refer [make-money]])
+  (:import java.time.LocalDate))
 
 
-(deftest test-buy
-  (testing "Appends trade to the trades log"
-    (let [mock (atom {})]
-      (with-redefs [id-gen/get-next-id mock/get-next-id
-                    save-trade (fn [t] (reset! mock {:trade t}))]
+(deftest test-any-trade-is-recorded
 
-        (let [acc (make-account "Knuckleheads" "Fargo account")
-              trade (make-trade "2020-12-22" "B" "HDFC" 100 2350.0 "INR" (:id acc))]
-          (buy acc trade)
+  (let [mock (atom {})]
+    (with-redefs [id-gen/get-next-id mock/get-next-id
+                  save-trade (fn [t] (reset! mock {:trade t}))]
 
-          (is (= "HDFC" (get-in @mock [:trade :stock])) 
-              "save-trade not called with correct details"))))))
+      (let [acc (make-account "Knuckleheads" "Fargo account")
+            a-buy (make-trade "2020-12-22" "B" "HDFC" 100 2350.0 "INR" (:id acc))
+            a-sale (make-trade "2020-12-24" "S" "HDFC" 100 2000.0 "INR" (:id acc))]
+        (testing "A buy appends to the trades log"
+          (buy acc a-buy)
+
+          (is (= "HDFC" (get-in @mock [:trade :stock]))
+              "save-trade not called with correct details"))
+
+        (testing "A sale appends to the trades log"
+          (sell acc a-sale)
+          (is (= "S" (get-in @mock [:trade :type]))
+              "save-trade not called with correct details")
+          (is (= (LocalDate/parse "2020-12-24") (get-in @mock [:trade :date]))))))))
+    
 
 (deftest test-holdings
     ;; mock-out
