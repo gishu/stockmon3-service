@@ -1,0 +1,2 @@
+ALTER TABLE st3.trades
+DROP COLUMN notes;

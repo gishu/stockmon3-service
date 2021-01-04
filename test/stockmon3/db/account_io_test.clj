@@ -56,11 +56,11 @@
 (deftest ^:integration account-holdings-persist
   (let [acc (make-account "customer" "yada")
         acc-id (:id acc)
-        buy-10-hdfc (make-trade "2020-12-01" "B" "HDFC" 10 1100 "INR" acc-id)
-        buy-20-hdfc (make-trade "2020-12-12" "B" "HDFC" 20 1000 "INR" acc-id)
-        sell-5-hdfc (make-trade "2020-12-20" "S" "HDFC" 5 1400 "INR" acc-id)
-        sell-2-hdfc (make-trade "2020-12-25" "S" "HDFC" 2 1200 "INR" acc-id)
-        sell-3-hdfc (make-trade "2021-01-01" "S" "HDFC" 3 1250 "INR" acc-id)
+        buy-10-hdfc (make-trade "2020-12-01" "B" "HDFC" 10 1100 "INR" "" acc-id)
+        buy-20-hdfc (make-trade "2020-12-12" "B" "HDFC" 20 1000 "INR" "" acc-id)
+        sell-5-hdfc (make-trade "2020-12-20" "S" "HDFC" 5 1400 "INR" "" acc-id)
+        sell-2-hdfc (make-trade "2020-12-25" "S" "HDFC" 2 1200 "INR" "" acc-id)
+        sell-3-hdfc (make-trade "2021-01-01" "S" "HDFC" 3 1250 "INR" "" acc-id)
 
         ]
 

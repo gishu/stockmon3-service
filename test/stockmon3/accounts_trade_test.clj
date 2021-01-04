@@ -5,8 +5,7 @@
              [trade :refer [make-trade]]]
             [stockmon3.domain.id-gen :as id-gen]
             [stockmon3.id-gen-mock :as mock]
-            [stockmon3.utils :refer [make-money]])
-  (:import java.time.LocalDate))
+            [stockmon3.utils :refer [make-money]]))
 
 
 (deftest test-any-trade-is-recorded
@@ -16,8 +15,8 @@
                   save-trade (fn [t] (reset! mock {:trade t}))]
 
       (let [acc (make-account "Knuckleheads" "Fargo account")
-            a-buy (make-trade "2020-12-22" "B" "HDFC" 100 2350.0 "INR" (:id acc))
-            a-sale (make-trade "2020-12-24" "S" "HDFC" 100 2000.0 "INR" (:id acc))]
+            a-buy (make-trade "2020-12-22" "B" "HDFC" 100 2350.0 "INR" "" (:id acc))
+            a-sale (make-trade "2020-12-24" "S" "HDFC" 100 2000.0 "INR" "liquidate!" (:id acc))]
         (testing "A buy appends to the trades log"
           (buy acc a-buy)
 
@@ -28,7 +27,7 @@
           (sell acc a-sale)
           (is (= "S" (get-in @mock [:trade :type]))
               "save-trade not called with correct details")
-          (is (= (LocalDate/parse "2020-12-24") (get-in @mock [:trade :date]))))))))
+          (is (= "liquidate!" (get-in @mock [:trade :notes]))))))))
     
 
 (deftest test-holdings
@@ -38,10 +37,10 @@
 
     (let [acc (make-account "customer" "yada")
           acc-id (:id acc)
-          trade1 (make-trade "2020-12-01" "B" "HDFC" 10 1100 "INR" acc-id)
-          trade2 (make-trade "2020-12-12" "B" "HDFC" 20 1000 "INR" acc-id)
-          trade3 (make-trade "2020-12-20" "S" "HDFC" 5 1400 "INR" acc-id)
-          trade4 (make-trade "2020-12-30" "S" "HDFC" 10 1450 "INR" acc-id)]
+          trade1 (make-trade "2020-12-01" "B" "HDFC" 10 1100 "INR" "" acc-id)
+          trade2 (make-trade "2020-12-12" "B" "HDFC" 20 1000 "INR" "" acc-id)
+          trade3 (make-trade "2020-12-20" "S" "HDFC" 5 1400 "INR" "" acc-id)
+          trade4 (make-trade "2020-12-30" "S" "HDFC" 10 1450 "INR" "" acc-id)]
 
       (testing "single holding"
         (buy acc trade1)
