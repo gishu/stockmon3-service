@@ -16,18 +16,24 @@
 (defn get-holdings [account]
   @(:holdings account))
 
-(declare add deduct)
+(declare add-update-fn deduct-update-fn split-update-fn)
 (defn buy [account trade]
   (save-trade trade)
-  (swap! (:holdings account) add trade)
+  (swap! (:holdings account) add-update-fn trade)
   account)
 
 (defn sell [account trade]
   ;; TODO: no holding BOOM!
   ;; TODO: not enough holdings for sale
   (save-trade trade)
-  (swap! (:holdings account) deduct trade)
+  (swap! (:holdings account) deduct-update-fn trade)
   account)
+
+(defn split [account event]
+  (save-trade event)
+  (swap! (:holdings account) split-update-fn event)
+  account
+  )
 
 (defn get-average-stats [holdings]
   (let [total-qty (reduce #(+ %1 (:rem-qty %2)) 0 holdings)]
@@ -37,7 +43,7 @@
         [total-qty
          (money/divide monies total-qty :floor)]))))
 
-(defn- add [holdings trade]
+(defn- add-update-fn [holdings trade]
   (let [{:keys [stock qty price]} trade
         trade-with-rem-qty (assoc trade :rem-qty qty)
         holding (get holdings stock)]
@@ -69,7 +75,7 @@
     [buy-trade, 0]))
   
 
-(defn- deduct [holdings sale-trade]
+(defn- deduct-update-fn [holdings sale-trade]
   (let [{stock :stock, sale-qty :qty} sale-trade
         holding  (get holdings stock)]
     
@@ -81,5 +87,18 @@
 
       (assoc holdings stock {:total-qty total-qty, :avg-price avg-price, :buys updated-trades}))))
 
+(defn- split-holding [holding factor]
+  (let [{:keys [rem-qty price]} holding]
+    
+    (assoc holding
+           :rem-qty (* rem-qty factor)
+           :price (money/divide price factor)
+           :modified true)))
 
+(defn- split-update-fn [holdings event]
+  (let [{stock :stock factor :qty} event
+        stock-entry (get holdings stock)
+        updated-holdings (map #(split-holding % factor) (:buys stock-entry))
+        [total-qty, avg-price] (get-average-stats updated-holdings)]
 
+    (assoc holdings stock {:total-qty total-qty :avg-price avg-price :buys updated-holdings})))

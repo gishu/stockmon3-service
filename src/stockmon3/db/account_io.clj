@@ -48,8 +48,10 @@
     (save-new-holdings to-insert db)
 
     (doseq [record to-update]
-      (sql/update! db :st3.holdings {:rem_qty (:rem-qty record)}
-                   {:id (:holding_id record)}))
+      (let [{:keys [rem-qty price]} record
+            new-price (-> price .getAmount .doubleValue)]
+        (sql/update! db :st3.holdings {:rem_qty rem-qty :price new-price}
+                     {:id (:holding_id record)})))
 
     (let [to-delete (difference prev-holding-ids cur-holding-ids)]
       (doseq [record-id to-delete]
@@ -57,7 +59,8 @@
 
 (defn load-holdings [db account-id]
 
-  (let [rows (jdbc/execute! db ["select t.*, h.rem_qty, h.id as holding_id 
+  (let [rows (jdbc/execute! db ["select t.id, t.account_id, t.trade_date, t.type, t.stock, t.qty, t.notes, t.created_at,
+                                 h.rem_qty, h.price, h.currency, h.id as holding_id 
                                  from st3.holdings h inner join st3.trades t
                                  ON h.buy_id = t.id AND h.account_id = ?
                                  order by h.id" account-id])
@@ -84,9 +87,9 @@
             (assoc :created_at (.toInstant created-at)))))))
 
 (defn- save-new-holdings [to-insert db]
-  (let [rows-to-insert (map #(let [{:keys [account-id id rem-qty]} %]
-                               [account-id id rem-qty])
+  (let [rows-to-insert (map #(let [{:keys [account-id id rem-qty price]} %]
+                               [account-id id rem-qty (-> price .getAmount .doubleValue) (-> price .getCurrencyUnit .toString)])
                             to-insert)]
     (sql/insert-multi! db :st3.holdings
-                       [:account_id :buy_id :rem_qty]
+                       [:account_id :buy_id :rem_qty :price :currency]
                        rows-to-insert)))

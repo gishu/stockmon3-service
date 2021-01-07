@@ -2,8 +2,8 @@
   (:require [clojure.test :refer :all]
             [ragtime.repl :as repl]
             [stockmon3.db.account-io :refer [save-account load-account]]
-            [stockmon3.domain.account :refer [make-account get-holdings buy sell]]
-            [stockmon3.domain.trade :refer [make-trade]]
+            [stockmon3.domain.account :refer [make-account get-holdings buy sell split]]
+            [stockmon3.domain.trade :refer [make-trade make-split-event]]
             [stockmon3.migrations :refer [config]]
             [stockmon3.utils :refer [make-money]]))
 
@@ -60,9 +60,7 @@
         buy-20-hdfc (make-trade "2020-12-12" "B" "HDFC" 20 1000 "INR" "" acc-id)
         sell-5-hdfc (make-trade "2020-12-20" "S" "HDFC" 5 1400 "INR" "" acc-id)
         sell-2-hdfc (make-trade "2020-12-25" "S" "HDFC" 2 1200 "INR" "" acc-id)
-        sell-3-hdfc (make-trade "2021-01-01" "S" "HDFC" 3 1250 "INR" "" acc-id)
-
-        ]
+        sell-3-hdfc (make-trade "2021-01-01" "S" "HDFC" 3 1250 "INR" "" acc-id)]
 
     (testing "- save new holdings"
       (save-account acc)
@@ -76,22 +74,21 @@
             holdings (-> loaded-account
                          get-holdings
                          (get "HDFC"))]
+
         (is (= {:total-qty 25 :avg-price (make-money 1020 "INR")}
                (select-keys holdings [:total-qty :avg-price]))
             "! - holdings not loaded for account")))
-    
+
     (testing "- update only changed holdings"
       (-> (load-account 1)
           (sell sell-2-hdfc)
           save-account)
-      
+
       (let [account (load-account 1)
             hdfc-holdings (-> account get-holdings (get-in ["HDFC" :buys]))]
 
         (is (= [1 2] (map #(:holding_id %) hdfc-holdings))
-            "holdings should be updated not recreated!")
-        )
-      )
+            "holdings should be updated not recreated!")))
     (testing "- delete exhausted holdings"
       (-> (load-account 1)
           (sell sell-3-hdfc)
@@ -100,16 +97,33 @@
       (let [account (load-account 1)
             all-holdings (get-holdings account)
             hdfc-holdings (-> account get-holdings (get-in ["HDFC" :buys]))]
-        
+
         ;; check holdings summary
         (is (= [20 "INR 1000.00"]
                [(get-in all-holdings ["HDFC" :total-qty])
                 (-> all-holdings
                     (get-in ["HDFC" :avg-price])
                     .toString)]))
-        
+
         ;; check holdings are cleared
         (is (= [2] (map #(:holding_id %) hdfc-holdings))
             "holding#1 is completely sold (10-5-2-3) and should not be seen")))
-    ))
+
+    (testing "- split stocks are persisted correctly"
+      ;; 20@1000 and 5@1200 is split in 1:10 ratio 
+      (-> (load-account 1)
+          (buy (make-trade "2021-01-18" "B" "HDFC" 5 1200 "INR" "" acc-id))
+          (split (make-split-event "2021-01-10" "HDFC" 10 "1:10 split" acc-id))
+          save-account)
+
+      (let [account (load-account 1)
+            hdfc-entry (-> account get-holdings (get "HDFC"))]
+        (is (= '([200, 100.00M] [50, 120.00M]) 
+               (map #(vector (:rem-qty %) (-> % :price .getAmount)) 
+                     (:buys hdfc-entry) ))
+            "individual holdings are not split 1:10")
+        
+        (is (= {:total-qty 250 :avg-price (make-money 104 "INR")}
+               (select-keys hdfc-entry [:total-qty :avg-price]))
+            "! - holdings do not account for stock split 20*10 @ 1000/10")))))
 

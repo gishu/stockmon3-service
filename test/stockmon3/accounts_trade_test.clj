@@ -1,7 +1,7 @@
 (ns stockmon3.accounts-trade-test
   (:require [clojure.test :refer :all]
             [stockmon3.db.trade-io :refer [save-trade]]
-            [stockmon3.domain [account :refer [make-account buy sell get-holdings]]
+            [stockmon3.domain [account :refer [make-account buy sell split get-holdings]]
              [trade :refer [make-trade]]]
             [stockmon3.domain.id-gen :as id-gen]
             [stockmon3.id-gen-mock :as mock]
@@ -82,4 +82,27 @@
           (is (= 1 (count (get holdings :buys)))
               "- holdings with rem-qty = 0 should be removed."))))))
  
-  
+  (deftest test-holdings-on-stock-split
+
+    (with-redefs [id-gen/get-next-id mock/get-next-id
+                  save-trade identity]
+
+      (let [acc (make-account "customer" "yada")
+            acc-id (:id acc)
+            trade1 (make-trade "2020-12-01" "B" "HDFC" 10 26000 "INR" "" acc-id)
+            trade2 (make-trade "2020-12-12" "B" "HDFC" 20 28000 "INR" "" acc-id)
+            trade3 (make-trade "2020-12-20" "S" "HDFC" 5 22000 "INR" "" acc-id)
+            the-split (make-trade "2020-12-30" "X" "HDFC" 10 0 "INR" "stock splits 1:10" acc-id)]
+
+        (-> acc
+            (buy trade1)
+            (buy trade2)
+            (sell trade3)
+            (split the-split))
+
+        (let [hdfc-holdings (-> acc get-holdings (get-in ["HDFC" :buys]))]
+          (is (= [50, 200] (map :rem-qty hdfc-holdings))
+              "stock split 1:10 should multiply holdings")
+          (is (= ["INR 2600.00", "INR 2800.00"] (map #(.toString (:price %)) hdfc-holdings))
+              "stock split 1:10 should scale acq price accordingly"))))
+    )

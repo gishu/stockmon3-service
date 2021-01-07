@@ -1,10 +1,10 @@
-(ns stockmon3.db.trades-io-test
+(ns stockmon3.db.trade-io-test
   (:require [clojure.test :refer :all]
             [ragtime.repl :as repl]
             [stockmon3.db [account-io :refer [save-account]]
              [trade-io :refer [save-trade get-trades-for-account]]]
             [stockmon3.domain [account :refer :all]
-             [trade :refer [make-trade]]]
+             [trade :refer [make-trade make-split-event]]]
             [stockmon3.migrations :refer [config]]))
 
 (declare setup-db teardown-db)
@@ -36,14 +36,26 @@
       (let [loaded-trade  (first (get-trades-for-account created-id))]
 
         (is (= trade
-               (dissoc loaded-trade :created_at)) "trade not saved linked to the right account")))
+               (dissoc loaded-trade :created_at)) "trade details not saved")))
 
     (testing "Append a sale to the trade log"
       (let [sale (make-trade "2021-01-01" "S" "MGL" 50 1060 "INR" "sold!" created-id)]
         (save-trade sale)
 
         (let [loaded-trade  (second (get-trades-for-account created-id))]
-          
+
           (is (= sale
-                 (dissoc loaded-trade :created_at)) "trade not saved linked to the right account"))))))
+                 (dissoc loaded-trade :created_at)) "trade details not saved "))))
+    
+    (testing "Append a split event to the trade log"
+      (let [event (make-split-event "2021-01-05" "MGL" 10 "Split 1:10" created-id)]
+        (save-trade event)
+        (let [loaded-trade  (nth (get-trades-for-account created-id) 2)]
+
+          (is (= event
+                 (dissoc loaded-trade :created_at)) "trade details not saved ")
+          (is (= "X"
+                 (:type loaded-trade))
+              "split events should be denoted by type X")
+          )))))
 
