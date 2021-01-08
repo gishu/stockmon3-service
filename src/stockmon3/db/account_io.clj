@@ -24,6 +24,7 @@
 
 
 (declare save-new-holdings)
+
 (defn save-holdings [db all-holdings account-id]
 ; flatten the grouped holdings into a seq of {}[Trade + rem-qty]
   (let [holdings (map (fn [[_, value]] (:buys value)) all-holdings)
@@ -82,7 +83,7 @@
       (let [created-at (:created_at row)
             holdings (load-holdings db id)]
         (-> row
-            (assoc :holdings (atom holdings))
+            (assoc :state (atom {:holdings holdings}))
             map->Account
             (assoc :created_at (.toInstant created-at)))))))
 

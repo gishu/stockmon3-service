@@ -26,17 +26,19 @@
 
 (deftest ^:integration account-attributes-persist
   (testing "Accounts can be created and persisted"
-  (let [name "TestUser" desc "mera demat account"
-        account (make-account name desc)
-        created-id (:id account)]
-    (save-account account)
-    
-    (let [loaded (load-account created-id)]
-      (is (= (dissoc account :holdings) 
-             (dissoc loaded :created_at :holdings)) "loaded account doesn't match the saved one")
-      )
-    
-    ))
+    (let [name "TestUser" desc "mera demat account"
+          account (make-account name desc)
+          created-id (:id account)]
+      (save-account account)
+
+      (let [loaded-account (load-account created-id)]
+        (is (= (dissoc account :state)
+               (dissoc loaded-account :created_at :state))
+            "loaded account doesn't match the saved one")
+        (is (= @(:state account)
+               @(:state loaded-account))
+            "loaded account state:holdings don't match"))))
+  
   (testing "Accounts can be updated"
     (let [original (load-account 1)
           new-name "Mando"

@@ -3,37 +3,37 @@
             [stockmon3.db.trade-io :refer [save-trade]]
             [stockmon3.domain.id-gen :refer [get-next-id]]))
 
-(defrecord Account [id name description holdings])
+(defrecord Account [id name description state])
 
 
 (defn make-account 
   "create a new account with the given `name` and `description`"
   [name description]
   
-  (->Account (get-next-id :account 1) name description (atom {})))
+  (->Account (get-next-id :account 1) name description (atom {:holdings {}})))
 
 
 (defn get-holdings [account]
-  @(:holdings account))
+  (:holdings @(:state account)))
 
 (declare update-for-new-holdings  update-for-split update-for-sale)
 (defn buy [account trade]
   (save-trade trade)
-  (swap! (:holdings account) update-for-new-holdings trade)
+  (swap! (:state account) update-for-new-holdings trade)
   account)
 
 (defn sell [account trade]
   ;; TODO: no holding BOOM!
   ;; TODO: not enough holdings for sale
   (save-trade trade)
-  (swap! (:holdings account) update-for-sale trade)
+  (swap! (:state account) update-for-sale trade)
   account)
 
 (defn split
   "records a stock split event adjusting the stock qty and price"
   [account event]
   (save-trade event)
-  (swap! (:holdings account) update-for-split event)
+  (swap! (:state account) update-for-split event)
   account
   )
 
@@ -47,21 +47,22 @@
         [total-qty
          (money/divide monies total-qty :floor)]))))
 
-(defn- update-for-new-holdings 
+(defn- update-for-new-holdings
   "appends the holding to a map [stock => {total-qty, avg-price, list of holdings}]"
-  [holdings trade]
+  [state trade]
   (let [{:keys [stock qty price]} trade
         trade-with-rem-qty (assoc trade :rem-qty qty)
+        holdings (get state :holdings)
         holding (get holdings stock)]
     (if holding
       ; merge the new holding with existing & update stats
       (let [trades (conj (:buys holding) trade-with-rem-qty)
             [total-qty avg-price] (get-average-stats trades)]
-        (assoc holdings stock {:total-qty total-qty, :avg-price avg-price, :buys trades}))
+        (update-in state [:holdings stock]
+                   (constantly {:total-qty total-qty, :avg-price avg-price, :buys trades})))
       ; create the entry in the map
-      (assoc holdings stock {:total-qty qty, :avg-price price :buys [trade-with-rem-qty]}))
-    )
-  )
+      (update-in state [:holdings stock]
+                 (constantly {:total-qty qty, :avg-price price :buys [trade-with-rem-qty]})))))
 
 (defn fifo-sale-matcher 
   "a reduce function which matches each sale with 1-or-more holdings in FIFO order.
@@ -90,10 +91,10 @@
       ))
   )
 
-(defn- update-for-sale [holdings sale-trade]
+(defn- update-for-sale [state sale-trade]
   ;;TODO :Check insufficient holdings for sale
   (let [{:keys [stock]} sale-trade
-        stock-holdings (get-in holdings [stock :buys])
+        stock-holdings (get-in state [:holdings stock :buys])
         result-map (reduce fifo-sale-matcher
                            {:sale sale-trade :updated-holdings [] :gains []}
                            stock-holdings)
@@ -101,7 +102,8 @@
         updated-holdings (filter #(> (:rem-qty %) 0) updated-holdings)
         [total-qty, avg-price] (get-average-stats updated-holdings)]
 
-    (assoc holdings stock {:total-qty total-qty, :avg-price avg-price, :buys updated-holdings})))
+    (update-in state [:holdings stock]
+               (constantly {:total-qty total-qty, :avg-price avg-price, :buys updated-holdings}))))
 
 (defn- split-holding [holding factor]
   (let [{:keys [rem-qty price]} holding]
@@ -111,10 +113,12 @@
            :price (money/divide price factor)
            :modified true)))
 
-(defn- update-for-split [holdings event]
+(defn- update-for-split [state event]
   (let [{stock :stock factor :qty} event
-        stock-entry (get holdings stock)
+        stock-entry (get-in state [:holdings stock])
         updated-holdings (map #(split-holding % factor) (:buys stock-entry))
         [total-qty, avg-price] (get-average-stats updated-holdings)]
 
-    (assoc holdings stock {:total-qty total-qty :avg-price avg-price :buys updated-holdings})))
+    (update-in state [:holdings stock]
+               (constantly
+                {:total-qty total-qty :avg-price avg-price :buys updated-holdings}))))
