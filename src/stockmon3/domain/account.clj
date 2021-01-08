@@ -16,26 +16,30 @@
 (defn get-holdings [account]
   @(:holdings account))
 
-(declare add-update-fn deduct-update-fn split-update-fn)
+(declare update-for-new-holdings  update-for-split update-for-sale)
 (defn buy [account trade]
   (save-trade trade)
-  (swap! (:holdings account) add-update-fn trade)
+  (swap! (:holdings account) update-for-new-holdings trade)
   account)
 
 (defn sell [account trade]
   ;; TODO: no holding BOOM!
   ;; TODO: not enough holdings for sale
   (save-trade trade)
-  (swap! (:holdings account) deduct-update-fn trade)
+  (swap! (:holdings account) update-for-sale trade)
   account)
 
-(defn split [account event]
+(defn split
+  "records a stock split event adjusting the stock qty and price"
+  [account event]
   (save-trade event)
-  (swap! (:holdings account) split-update-fn event)
+  (swap! (:holdings account) update-for-split event)
   account
   )
 
-(defn get-average-stats [holdings]
+(defn get-average-stats 
+  "Returns a vector [total # of shares, avg price] given a collection of holdings"
+  [holdings]
   (let [total-qty (reduce #(+ %1 (:rem-qty %2)) 0 holdings)]
     (if (= 0 total-qty)
       [0 money/zero]
@@ -43,7 +47,9 @@
         [total-qty
          (money/divide monies total-qty :floor)]))))
 
-(defn- add-update-fn [holdings trade]
+(defn- update-for-new-holdings 
+  "appends the holding to a map [stock => {total-qty, avg-price, list of holdings}]"
+  [holdings trade]
   (let [{:keys [stock qty price]} trade
         trade-with-rem-qty (assoc trade :rem-qty qty)
         holding (get holdings stock)]
@@ -57,35 +63,45 @@
     )
   )
 
-(defn- map-with-state[func state coll]
-  (when-let [[x & xs] (seq coll)]
-    
-    (lazy-seq
-     (let [[mapped-x new-state] (func x state)]
-       (cons mapped-x (map-with-state func new-state xs))))))
-
-(defn- fifo-match-sale [buy-trade sale-qty]
-  (if (> sale-qty 0)
-
-    (let [held-qty (:rem-qty buy-trade)
-          gain-qty (min sale-qty held-qty)
-          updated-trade (assoc buy-trade :rem-qty (- held-qty gain-qty) :modified true)]
-
-      [updated-trade, (- sale-qty gain-qty)])
-    [buy-trade, 0]))
+(defn fifo-sale-matcher 
+  "a reduce function which matches each sale with 1-or-more holdings in FIFO order.
+   Inputs: sale-trade in `state-map`
+   Outputs: Adjusted holdings vector and gains vector in updated `state-map`"
+  [state-map holding]
   
-
-(defn- deduct-update-fn [holdings sale-trade]
-  (let [{stock :stock, sale-qty :qty} sale-trade
-        holding  (get holdings stock)]
+  (let [{:keys [sale, updated-holdings, gains]} state-map
+        sale-qty (:qty sale)
+        sale-id (:id sale)
+        {held-qty :rem-qty, buy-id :id} holding]
     
+    
+    (if (> sale-qty 0)
+    ;deduct it from a holding
+      (let [matched-qty (min sale-qty held-qty)
+            updated-holding (assoc holding :rem-qty (- held-qty matched-qty)
+                                   :modified true)
+            sale (assoc sale :qty (- sale-qty matched-qty))
+            gain {:buy-id buy-id :sale-id sale-id, :qty matched-qty}]
+        (assoc state-map :updated-holdings (conj updated-holdings updated-holding)
+               :sale sale
+               :gains (conj gains gain)))
+    ;else no-change
+      (assoc state-map :updated-holdings (conj updated-holdings holding))
+      ))
+  )
 
-    (let [updated-trades (map-with-state fifo-match-sale sale-qty (:buys holding))
-          ; remove holdings with 0 qty remaining
-          updated-trades (filter #(> (:rem-qty %) 0) updated-trades)
-          [total-qty, avg-price] (get-average-stats updated-trades)]
+(defn- update-for-sale [holdings sale-trade]
+  ;;TODO :Check insufficient holdings for sale
+  (let [{:keys [stock]} sale-trade
+        stock-holdings (get-in holdings [stock :buys])
+        result-map (reduce fifo-sale-matcher
+                           {:sale sale-trade :updated-holdings [] :gains []}
+                           stock-holdings)
+        {:keys [updated-holdings, gains]} result-map
+        updated-holdings (filter #(> (:rem-qty %) 0) updated-holdings)
+        [total-qty, avg-price] (get-average-stats updated-holdings)]
 
-      (assoc holdings stock {:total-qty total-qty, :avg-price avg-price, :buys updated-trades}))))
+    (assoc holdings stock {:total-qty total-qty, :avg-price avg-price, :buys updated-holdings})))
 
 (defn- split-holding [holding factor]
   (let [{:keys [rem-qty price]} holding]
@@ -95,7 +111,7 @@
            :price (money/divide price factor)
            :modified true)))
 
-(defn- split-update-fn [holdings event]
+(defn- update-for-split [holdings event]
   (let [{stock :stock factor :qty} event
         stock-entry (get holdings stock)
         updated-holdings (map #(split-holding % factor) (:buys stock-entry))
