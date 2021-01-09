@@ -29,7 +29,7 @@
                 (assoc :created_at (Instant/now)
                        :price (-> amount .getAmount .doubleValue)
                        :currency (-> amount .getCurrencyUnit .toString)))]
-
+    
     (sql/insert! (get-db-conn) :st3.trades row)))
 
 
@@ -41,19 +41,13 @@
                 (-> attr-map
                     (dissoc :currency)
                     (assoc :price (make-money price currency))
-                    (rename-keys {:trade_date :date :account_id :account-id})))))
+                    (rename-keys {:trade_date :date 
+                                  :account_id :account-id 
+                                  :created_at :created-at})))))
        (map mapSqlToTimeTypes)
        (map map->Trade)))
 
 (defn get-trades-for-account [account-id]
 
   (->> (sql/find-by-keys (get-db-conn) :st3.trades {:account_id account-id})
-       (map (fn [attr-map]   ; rename trade_date to date
-              (let [{:keys [price currency]} attr-map]
-
-                (-> attr-map
-                    (dissoc :currency)
-                    (assoc :price (make-money price currency))
-                    (rename-keys {:trade_date :date :account_id :account-id})))))
-       (map mapSqlToTimeTypes)
-       (map map->Trade)))
+       map->Trades))

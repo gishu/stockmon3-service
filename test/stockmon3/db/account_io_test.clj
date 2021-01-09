@@ -2,8 +2,11 @@
   (:require [clojure.test :refer :all]
             [ragtime.repl :as repl]
             [stockmon3.db.account-io :refer [save-account load-account]]
-            [stockmon3.domain.account :refer [make-account get-holdings buy sell split]]
+            [stockmon3.domain.account :refer [make-account 
+                                              get-holdings get-gains
+                                              buy sell split]]
             [stockmon3.domain.trade :refer [make-trade make-split-event]]
+            [stockmon3.domain.id-gen :as id-gen]
             [stockmon3.migrations :refer [config]]
             [stockmon3.utils :refer [make-money]]))
 
@@ -17,7 +20,9 @@
 (use-fixtures :each db-fixture)
 
 (defn setup-db []
-  (repl/migrate config))
+  (repl/migrate config)
+  ;; reset the id generator to avoid getting cached ids
+  (id-gen/reset))
 
 (defn teardown-db []
   
@@ -32,8 +37,9 @@
       (save-account account)
 
       (let [loaded-account (load-account created-id)]
+        
         (is (= (dissoc account :state)
-               (dissoc loaded-account :created_at :state))
+               (dissoc loaded-account :created-at :state))
             "loaded account doesn't match the saved one")
         (is (= @(:state account)
                @(:state loaded-account))
@@ -129,3 +135,36 @@
                (select-keys hdfc-entry [:total-qty :avg-price]))
             "! - holdings do not account for stock split 20*10 @ 1000/10")))))
 
+(deftest ^:integration account-gains-persist
+  (let [acc (make-account "customer" "yada")
+        acc-id (:id acc)
+        buy-10-hdfc (make-trade "2020-12-01" "B" "HDFC" 10 1100 "INR" "" acc-id)
+        buy-20-hdfc (make-trade "2020-12-12" "B" "HDFC" 20 1000 "INR" "" acc-id)
+        sell-15-hdfc (make-trade "2020-12-20" "S" "HDFC" 15 1400 "INR" "" acc-id)
+        sell-5-hdfc (make-trade "2020-12-22" "S" "HDFC" 5 1450 "INR" "" acc-id)]
+    (testing "- save gains"
+      (save-account acc)
+      (-> (load-account 1)
+          (buy  buy-10-hdfc)
+          (buy  buy-20-hdfc)
+          (sell sell-15-hdfc)
+          save-account)
+
+      (let [account (load-account 1)
+            gains (get-gains account)]
+
+        (is (= 2 (count gains))
+            "shoud have loaded 2 gain entries")
+        (is (= '(10 5) (map :qty gains)))))
+    
+    (testing "- save new gains"
+      (-> (load-account 1)
+          (sell sell-5-hdfc)
+          save-account)
+
+      (let [account (load-account 1)
+            gains (get-gains account)]
+
+        (is (= 3 (count gains))
+            "shoud have loaded 3 gain entries")
+        (is (= '(10 5 5) (map :qty gains)))))))

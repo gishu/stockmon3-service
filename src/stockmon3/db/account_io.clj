@@ -4,28 +4,40 @@
             [next.jdbc [sql :as sql] date-time]
             [stockmon3.db.conn :refer [get-db-conn]]
             [stockmon3.db.trade-io :refer [map->Trades]]
-            [stockmon3.domain.account :refer [map->Account get-holdings get-average-stats]])
+            [stockmon3.domain.account :refer [map->Account get-holdings get-gains get-average-stats]])
   (:import java.time.Instant))
 
-(declare save-holdings)
+(declare save-holdings save-new-holdings save-gains load-holdings load-gains)
 
 (defn save-account [an-account]
   (let [db (get-db-conn)]
     
-    (if (:created_at an-account)
+    (if (:created-at an-account)
       (let [{:keys [id]} an-account]
         (sql/update! db :st3.accounts
                      (select-keys an-account [:name :description])
                      {:id id})
-        (save-holdings db (get-holdings an-account) id))
+        (save-holdings db (get-holdings an-account) id)
+        (save-gains db (get-gains an-account) id))
+      
       (sql/insert! db :st3.accounts
                    (-> (select-keys an-account [:id :name :description])
                        (assoc :created_at (Instant/now)))))))
 
+(defn load-account [id]
+  (let [db (get-db-conn)
+        row  (sql/get-by-id (get-db-conn) :st3.accounts id)]
+    (when row
+      (let [created-at (:created_at row)
+            holdings (load-holdings db id)
+            gains (load-gains db id)]
+        (-> row
+            (assoc :state (atom {:holdings holdings :gains gains})
+                   :created-at (.toInstant created-at))
+            (dissoc :created_at)
+            map->Account)))))
 
-(declare save-new-holdings)
-
-(defn save-holdings [db all-holdings account-id]
+(defn- save-holdings [db all-holdings account-id]
 ; flatten the grouped holdings into a seq of {}[Trade + rem-qty]
   (let [holdings (map (fn [[_, value]] (:buys value)) all-holdings)
         holdings (->> holdings
@@ -58,7 +70,15 @@
       (doseq [record-id to-delete]
         (sql/delete! db :st3.holdings {:id record-id})))))
 
-(defn load-holdings [db account-id]
+(defn- save-new-holdings [to-insert db]
+  (let [rows-to-insert (map #(let [{:keys [account-id id rem-qty price]} %]
+                               [account-id id rem-qty (-> price .getAmount .doubleValue) (-> price .getCurrencyUnit .toString)])
+                            to-insert)]
+    (sql/insert-multi! db :st3.holdings
+                       [:account_id :buy_id :rem_qty :price :currency]
+                       rows-to-insert)))
+
+(defn- load-holdings [db account-id]
 
   (let [rows (jdbc/execute! db ["select t.id, t.account_id, t.trade_date, t.type, t.stock, t.qty, t.notes, t.created_at,
                                  h.rem_qty, h.price, h.currency, h.id as holding_id 
@@ -75,22 +95,23 @@
                 (let [[total-qty avg-price] (get-average-stats holdings)]
                   [stock {:total-qty total-qty, :avg-price avg-price, :buys holdings}])))
          (into {}))))
-  
-(defn load-account [id]
-  (let [db (get-db-conn)
-        row  (sql/get-by-id (get-db-conn) :st3.accounts id)]
-    (when row
-      (let [created-at (:created_at row)
-            holdings (load-holdings db id)]
-        (-> row
-            (assoc :state (atom {:holdings holdings}))
-            map->Account
-            (assoc :created_at (.toInstant created-at)))))))
 
-(defn- save-new-holdings [to-insert db]
-  (let [rows-to-insert (map #(let [{:keys [account-id id rem-qty price]} %]
-                               [account-id id rem-qty (-> price .getAmount .doubleValue) (-> price .getCurrencyUnit .toString)])
+(defn- load-gains [db account-id]
+  (let [rows (sql/query db ["select * from st3.profit_n_loss where account_id = ? order by id" account-id])]
+    (->> rows
+         (map #(rename-keys % {:account_id :account-id
+                               :buy_id :buy-id
+                               :sale_id :sale-id}))
+         (into []))))
+
+(defn- save-gains [db gains account-id]
+  
+  (let [to-insert (filter #((complement :id) %) gains)
+        rows-to-insert (map #(let [{:keys [buy-id sale-id qty]} %]
+                               [account-id buy-id sale-id qty])
                             to-insert)]
-    (sql/insert-multi! db :st3.holdings
-                       [:account_id :buy_id :rem_qty :price :currency]
+
+    (sql/insert-multi! db :st3.profit_n_loss
+                       [:account_id :buy_id :sale_id :qty]
                        rows-to-insert)))
+

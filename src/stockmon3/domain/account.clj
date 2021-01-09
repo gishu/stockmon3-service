@@ -10,11 +10,14 @@
   "create a new account with the given `name` and `description`"
   [name description]
   
-  (->Account (get-next-id :account 1) name description (atom {:holdings {}})))
+  (->Account (get-next-id :account 1) name description (atom {:holdings {} :gains []})))
 
 
 (defn get-holdings [account]
   (:holdings @(:state account)))
+
+(defn get-gains [account]
+  (:gains @(:state account)))
 
 (declare update-for-new-holdings  update-for-split update-for-sale)
 (defn buy [account trade]
@@ -102,8 +105,11 @@
         updated-holdings (filter #(> (:rem-qty %) 0) updated-holdings)
         [total-qty, avg-price] (get-average-stats updated-holdings)]
 
-    (update-in state [:holdings stock]
-               (constantly {:total-qty total-qty, :avg-price avg-price, :buys updated-holdings}))))
+    (-> 
+     (update-in state [:holdings stock]
+                (constantly {:total-qty total-qty, :avg-price avg-price, :buys updated-holdings}))
+     (update-in [:gains] #(apply conj %1 %2) gains)
+     )))
 
 (defn- split-holding [holding factor]
   (let [{:keys [rem-qty price]} holding]

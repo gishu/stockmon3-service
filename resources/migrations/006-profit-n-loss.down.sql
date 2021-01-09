@@ -1,0 +1,1 @@
+DROP TABLE st3.profit_n_loss;

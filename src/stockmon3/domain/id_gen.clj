@@ -22,19 +22,23 @@
     (when (or (nil? (entity @id-map))
               (> next-id reserved-max))
       (let [ds (get-db-conn)
-            entity-name (name entity)]
-
-        (let [rs
-              (sql/get-by-id ds :st3.keys entity-name :entity {})
-              db-next-id (:next_id rs)]
-          (if (nil? db-next-id)
-            (throw (Exception. (str "Unknown entity type " entity-name))))
+            entity-name (name entity)
+            rs (sql/get-by-id ds :st3.keys entity-name :entity {})
+            db-next-id (:next_id rs)]
+        (if (nil? db-next-id)
+          (throw (Exception. (str "Unknown entity type " entity-name)))
 
           (let [db-res-max (+ db-next-id (dec buffer-size))]
             (sql/update! ds :st3.keys {:next_id (inc db-res-max)} {:entity entity-name})
-            (swap! id-map update-id-map entity db-next-id db-res-max))))))
+            (swap! id-map update-id-map entity db-next-id db-res-max)))
+        )))
 
   ;; get next available id
   (let [{{:keys [next-id reserved-max]} entity} @id-map]
     (swap! id-map update-id-map entity (inc next-id) reserved-max)
     next-id))
+
+(defn reset 
+  "Resets the id-gen for clean tests / reject cached ids "
+  []
+  (reset! id-map {}))
