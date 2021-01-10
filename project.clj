@@ -8,7 +8,8 @@
                  [ragtime "0.8.0"]
                  [seancorfield/next.jdbc "1.1.613"]
                  [clojurewerkz/money "1.10.0"]
-                 [environ "1.2.0"]]
+                 [environ "1.2.0"]
+                 [org.clojure/data.csv "1.0.0"]]
   :plugins [[lein-environ "1.2.0"]]
   :main ^:skip-aot stockmon3.core
   :target-path "target/%s"
