@@ -144,7 +144,7 @@
     
     (assoc holding
            :rem-qty (* rem-qty factor)
-           :price (money/divide price factor)
+           :price (money/divide price factor :floor)
            :modified true)))
 
 (defn- update-for-split [state event]

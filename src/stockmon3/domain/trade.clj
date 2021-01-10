@@ -21,7 +21,14 @@
                notes
                account-id)))
 
-  (defn make-split-event [date stock factor notes account-id]
+  (defn make-split-event 
+    "`date` is LocalDate parseable string, factor must be a long value, 
+     `account-id` must refer to a valid account. Other inputs are open strings"
+    [date stock factor notes account-id]
+    
+    (when (not (instance? java.lang.Long factor))
+      (throw (IllegalArgumentException. "factor argument must be a long value")))
+    
     (make-trade date "X" stock factor 0 0 "INR" notes account-id ))
 
 
