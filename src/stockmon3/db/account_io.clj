@@ -114,8 +114,9 @@
 (defn- save-gains [db gains account-id]
   
   (let [to-insert (filter #((complement :id) %) gains)
-        rows-to-insert (map #(let [{:keys [buy-id sale-id qty charges gain duration]} %]
-                               [account-id buy-id sale-id qty
+        rows-to-insert (map #(let [{:keys [sale_date buy-id sale-id qty charges gain duration]} %]
+                               [account-id 
+                                sale_date buy-id sale-id qty
                                 (money->dbl charges)
                                 (money->dbl gain)
                                 (money->cur gain)
@@ -123,6 +124,6 @@
                             to-insert)]
 
     (sql/insert-multi! db :st3.profit_n_loss
-                       [:account_id :buy_id :sale_id :qty :charges :gain :currency :duration_days]
+                       [:account_id :sale_date :buy_id :sale_id :qty :charges :gain :currency :duration_days]
                        rows-to-insert)))
 

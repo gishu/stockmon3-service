@@ -1,6 +1,7 @@
 CREATE TABLE st3.profit_n_loss (
     id serial PRIMARY KEY, 
-    account_id integer, buy_id integer, sale_id integer,
+    account_id integer, 
+    sale_date DATE NOT NULL, buy_id integer, sale_id integer,
     qty integer NOT NULL,
     charges numeric(12,2) NOT NULL, gain numeric(12,2) NOT NULL, currency char(3) NOT NULL,
     duration_days integer,
