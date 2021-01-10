@@ -30,7 +30,7 @@
   (let [name "TestUser" desc "mera demat account"
         account (make-account name desc)
         created-id (:id account)
-        trade (make-trade "2020-12-22" "B" "MGL" 100 825 "INR" "gas?" created-id)]
+        trade (make-trade "2020-12-22" "B" "MGL" 100 825 10.5 "INR" "gas?" created-id)]
     (save-account account)
 
     (testing "Append a buy to trade log"
@@ -41,7 +41,7 @@
                (dissoc loaded-trade :created-at)) "trade details not saved")))
 
     (testing "Append a sale to the trade log"
-      (let [sale (make-trade "2021-01-01" "S" "MGL" 50 1060 "INR" "sold!" created-id)]
+      (let [sale (make-trade "2021-01-01" "S" "MGL" 50 1060 123 "INR" "sold!" created-id)]
         (save-trade sale)
 
         (let [loaded-trade  (second (get-trades-for-account created-id))]

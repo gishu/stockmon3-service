@@ -10,7 +10,7 @@
   (with-redefs [id-gen/get-next-id mock/get-next-id]
     
     (are [type] (= type
-                   (-> (make-trade "2020-12-11" type "HDFC" 10 1800 "INR" "nada" 100)
+                   (-> (make-trade "2020-12-11" type "HDFC" 10 1800 0 "INR" "nada" 100)
                        :type))
       "B" ; buy
       "X" ; split
@@ -22,5 +22,5 @@
   (with-redefs [id-gen/get-next-id mock/get-next-id]
 
     (is (thrown-with-msg? IllegalArgumentException #"type must be \[B/S/X\]"
-                          (make-trade "2020-12-11" "R" "XXX" 10 0 "INR" "XXX" 1))
+                          (make-trade "2020-12-11" "R" "XXX" 0 0 0 "INR" "XXX" 1))
         "invalid trade type not validated")))

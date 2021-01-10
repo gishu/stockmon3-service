@@ -8,7 +8,7 @@
             [stockmon3.domain.trade :refer [make-trade make-split-event]]
             [stockmon3.domain.id-gen :as id-gen]
             [stockmon3.migrations :refer [config]]
-            [stockmon3.utils :refer [make-money]]))
+            [stockmon3.utils :refer [make-money money->dbl]]))
 
 (declare setup-db teardown-db)
 
@@ -64,11 +64,11 @@
 (deftest ^:integration account-holdings-persist
   (let [acc (make-account "customer" "yada")
         acc-id (:id acc)
-        buy-10-hdfc (make-trade "2020-12-01" "B" "HDFC" 10 1100 "INR" "" acc-id)
-        buy-20-hdfc (make-trade "2020-12-12" "B" "HDFC" 20 1000 "INR" "" acc-id)
-        sell-5-hdfc (make-trade "2020-12-20" "S" "HDFC" 5 1400 "INR" "" acc-id)
-        sell-2-hdfc (make-trade "2020-12-25" "S" "HDFC" 2 1200 "INR" "" acc-id)
-        sell-3-hdfc (make-trade "2021-01-01" "S" "HDFC" 3 1250 "INR" "" acc-id)]
+        buy-10-hdfc (make-trade "2020-12-01" "B" "HDFC" 10 1100 1 "INR" "" acc-id)
+        buy-20-hdfc (make-trade "2020-12-12" "B" "HDFC" 20 1000 2 "INR" "" acc-id)
+        sell-5-hdfc (make-trade "2020-12-20" "S" "HDFC" 5 1400 3 "INR" "" acc-id)
+        sell-2-hdfc (make-trade "2020-12-25" "S" "HDFC" 2 1200 4 "INR" "" acc-id)
+        sell-3-hdfc (make-trade "2021-01-01" "S" "HDFC" 3 1250 5 "INR" "" acc-id)]
 
     (testing "- save new holdings"
       (save-account acc)
@@ -120,14 +120,14 @@
     (testing "- split stocks are persisted correctly"
       ;; 20@1000 and 5@1200 is split in 1:10 ratio 
       (-> (load-account 1)
-          (buy (make-trade "2021-01-18" "B" "HDFC" 5 1200 "INR" "" acc-id))
+          (buy (make-trade "2021-01-18" "B" "HDFC" 5 1200 60 "INR" "" acc-id))
           (split (make-split-event "2021-01-10" "HDFC" 10 "1:10 split" acc-id))
           save-account)
 
       (let [account (load-account 1)
             hdfc-entry (-> account get-holdings (get "HDFC"))]
-        (is (= '([200, 100.00M] [50, 120.00M]) 
-               (map #(vector (:rem-qty %) (-> % :price .getAmount)) 
+        (is (= '([200, 100.00] [50, 120.00]) 
+               (map #(vector (:rem-qty %) (-> % :price money->dbl)) 
                      (:buys hdfc-entry) ))
             "individual holdings are not split 1:10")
         
@@ -138,33 +138,43 @@
 (deftest ^:integration account-gains-persist
   (let [acc (make-account "customer" "yada")
         acc-id (:id acc)
-        buy-10-hdfc (make-trade "2020-12-01" "B" "HDFC" 10 1100 "INR" "" acc-id)
-        buy-20-hdfc (make-trade "2020-12-12" "B" "HDFC" 20 1000 "INR" "" acc-id)
-        sell-15-hdfc (make-trade "2020-12-20" "S" "HDFC" 15 1400 "INR" "" acc-id)
-        sell-5-hdfc (make-trade "2020-12-22" "S" "HDFC" 5 1450 "INR" "" acc-id)]
+        b1 (make-trade "2020-03-12" "B" "BFIN" 25 3700 105.9 "INR" "" acc-id)
+        b2 (make-trade "2020-03-23" "B" "BFIN" 25 2370 61.63 "INR" "" acc-id)
+        s1 (make-trade "2020-08-21" "S" "BFIN" 30 3650 94.61 "INR" "" acc-id)
+        s2 (make-trade "2020-11-10" "S" "BFIN" 20 4220 109 "INR" "" acc-id)]
     (testing "- save gains"
       (save-account acc)
+      
       (-> (load-account 1)
-          (buy  buy-10-hdfc)
-          (buy  buy-20-hdfc)
-          (sell sell-15-hdfc)
+          (buy  b1)
+          (buy  b2)
+          (sell s1)
           save-account)
-
+      
       (let [account (load-account 1)
             gains (get-gains account)]
 
         (is (= 2 (count gains))
-            "shoud have loaded 2 gain entries")
-        (is (= '(10 5) (map :qty gains)))))
+            "should have loaded 2 gain entries")
+        (is (= '(25 5) (map :qty gains)))))
     
-    (testing "- save new gains"
+    (testing "- save new gains with details"
+      
       (-> (load-account 1)
-          (sell sell-5-hdfc)
+          (sell s2)
           save-account)
 
       (let [account (load-account 1)
-            gains (get-gains account)]
+            gains (get-gains account)
+            profits (map #(-> % :gain .toString) gains)
+            charges (map #(-> % :charges .toString) gains)]
 
         (is (= 3 (count gains))
-            "shoud have loaded 3 gain entries")
-        (is (= '(10 5 5) (map :qty gains)))))))
+            "shoud have loaded old 2 + 1 new gain entries now")
+        (is (= '(25 5 20) (map :qty gains)))
+        
+        (is (= '("INR -1434.75" "INR 6371.90" "INR 36841.69") profits)
+            "gains not persisted correctly")
+        (is (= '("INR 184.75" "INR 28.10" "INR 158.31") charges)
+            "overheads/charges not persisted correctly")
+        ))))

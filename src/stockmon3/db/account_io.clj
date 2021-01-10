@@ -4,12 +4,14 @@
             [next.jdbc [sql :as sql] date-time]
             [stockmon3.db.conn :refer [get-db-conn]]
             [stockmon3.db.trade-io :refer [map->Trades]]
-            [stockmon3.domain.account :refer [map->Account get-holdings get-gains get-average-stats]])
+            [stockmon3.domain.account :refer [map->Account get-holdings get-gains get-average-stats]]
+            [stockmon3.utils :refer [make-money money->dbl money->cur]])
   (:import java.time.Instant))
 
 (declare save-holdings save-new-holdings save-gains load-holdings load-gains)
 
 (defn save-account [an-account]
+
   (let [db (get-db-conn)]
     
     (if (:created-at an-account)
@@ -62,7 +64,7 @@
 
     (doseq [record to-update]
       (let [{:keys [rem-qty price]} record
-            new-price (-> price .getAmount .doubleValue)]
+            new-price  (money->dbl price)]
         (sql/update! db :st3.holdings {:rem_qty rem-qty :price new-price}
                      {:id (:holding_id record)})))
 
@@ -72,7 +74,7 @@
 
 (defn- save-new-holdings [to-insert db]
   (let [rows-to-insert (map #(let [{:keys [account-id id rem-qty price]} %]
-                               [account-id id rem-qty (-> price .getAmount .doubleValue) (-> price .getCurrencyUnit .toString)])
+                               [account-id id rem-qty (money->dbl price) (money->cur price)])
                             to-insert)]
     (sql/insert-multi! db :st3.holdings
                        [:account_id :buy_id :rem_qty :price :currency]
@@ -80,7 +82,7 @@
 
 (defn- load-holdings [db account-id]
 
-  (let [rows (jdbc/execute! db ["select t.id, t.account_id, t.trade_date, t.type, t.stock, t.qty, t.notes, t.created_at,
+  (let [rows (jdbc/execute! db ["select t.id, t.account_id, t.trade_date, t.type, t.stock, t.qty, t.charges, t.notes, t.created_at,
                                  h.rem_qty, h.price, h.currency, h.id as holding_id 
                                  from st3.holdings h inner join st3.trades t
                                  ON h.buy_id = t.id AND h.account_id = ?
@@ -99,6 +101,11 @@
 (defn- load-gains [db account-id]
   (let [rows (sql/query db ["select * from st3.profit_n_loss where account_id = ? order by id" account-id])]
     (->> rows
+         (map #(let [{:keys [charges gain currency]} %]
+                 (-> %
+                     (assoc :charges (make-money charges currency)
+                            :gain (make-money gain currency))
+                     (dissoc :currency :duration_days))))
          (map #(rename-keys % {:account_id :account-id
                                :buy_id :buy-id
                                :sale_id :sale-id}))
@@ -107,11 +114,15 @@
 (defn- save-gains [db gains account-id]
   
   (let [to-insert (filter #((complement :id) %) gains)
-        rows-to-insert (map #(let [{:keys [buy-id sale-id qty]} %]
-                               [account-id buy-id sale-id qty])
+        rows-to-insert (map #(let [{:keys [buy-id sale-id qty charges gain duration]} %]
+                               [account-id buy-id sale-id qty
+                                (money->dbl charges)
+                                (money->dbl gain)
+                                (money->cur gain)
+                                duration])
                             to-insert)]
 
     (sql/insert-multi! db :st3.profit_n_loss
-                       [:account_id :buy_id :sale_id :qty]
+                       [:account_id :buy_id :sale_id :qty :charges :gain :currency :duration_days]
                        rows-to-insert)))
 

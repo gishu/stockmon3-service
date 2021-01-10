@@ -1,7 +1,8 @@
 (ns stockmon3.domain.account
   (:require [clojurewerkz.money.amounts :as money]
             [stockmon3.db.trade-io :refer [save-trade]]
-            [stockmon3.domain.id-gen :refer [get-next-id]]))
+            [stockmon3.domain.id-gen :refer [get-next-id]])
+  (:import java.time.temporal.ChronoUnit))
 
 (defrecord Account [id name description state])
 
@@ -67,6 +68,8 @@
       (update-in state [:holdings stock]
                  (constantly {:total-qty qty, :avg-price price :buys [trade-with-rem-qty]})))))
 
+(declare get-trade-stats)
+
 (defn fifo-sale-matcher 
   "a reduce function which matches each sale with 1-or-more holdings in FIFO order.
    Inputs: sale-trade in `state-map`
@@ -74,7 +77,7 @@
   [state-map holding]
   
   (let [{:keys [sale, updated-holdings, gains]} state-map
-        sale-qty (:qty sale)
+        sale-qty (:qty-to-match sale)
         sale-id (:id sale)
         {held-qty :rem-qty, buy-id :id} holding]
     
@@ -84,8 +87,11 @@
       (let [matched-qty (min sale-qty held-qty)
             updated-holding (assoc holding :rem-qty (- held-qty matched-qty)
                                    :modified true)
-            sale (assoc sale :qty (- sale-qty matched-qty))
-            gain {:buy-id buy-id :sale-id sale-id, :qty matched-qty}]
+            sale (assoc sale :qty-to-match (- sale-qty matched-qty))
+            {:keys [charges net duration-in-days]} (get-trade-stats updated-holding sale matched-qty)
+            gain {:buy-id buy-id :sale-id sale-id :qty matched-qty
+                  :charges charges :gain net :duration duration-in-days}]
+        
         (assoc state-map :updated-holdings (conj updated-holdings updated-holding)
                :sale sale
                :gains (conj gains gain)))
@@ -94,12 +100,34 @@
       ))
   )
 
+(defn- get-trade-stats
+  "get combined charges in proportion for sale qty including buy + sale charges.
+   e.g. if 100 was buy_charges for 100 qty and 100 as sale_charges for 50 qty,
+   then total charges for sale_qty=50 => 50+100"
+  [buy-trade sale-trade qty]
+
+  (let [{buy-charges :charges, buy-qty :qty cost-price :price buy-date :date} buy-trade
+        {sale-charges :charges, sale-qty :qty sale-price :price sale-date :date} sale-trade
+        charges-on-buy (money/multiply buy-charges (/ qty buy-qty) :up)
+        charges-on-sale (money/multiply sale-charges (/ qty sale-qty) :up)
+        total-charges (money/plus charges-on-buy charges-on-sale)]
+
+    {:charges total-charges
+     :net (->
+           (money/minus sale-price cost-price)
+           (money/multiply qty)
+           (money/minus total-charges))
+     :duration-in-days (.between (ChronoUnit/DAYS) buy-date sale-date)}))
+
+
+
 (defn- update-for-sale [state sale-trade]
   ;;TODO :Check insufficient holdings for sale
-  (let [{:keys [stock]} sale-trade
+  (let [{:keys [stock qty]} sale-trade
         stock-holdings (get-in state [:holdings stock :buys])
         result-map (reduce fifo-sale-matcher
-                           {:sale sale-trade :updated-holdings [] :gains []}
+                           {:sale (assoc sale-trade :qty-to-match qty) 
+                            :updated-holdings [] :gains []}
                            stock-holdings)
         {:keys [updated-holdings, gains]} result-map
         updated-holdings (filter #(> (:rem-qty %) 0) updated-holdings)

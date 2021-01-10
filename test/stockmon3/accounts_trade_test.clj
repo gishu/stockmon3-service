@@ -1,8 +1,9 @@
 (ns stockmon3.accounts-trade-test
   (:require [clojure.test :refer :all]
             [stockmon3.db.trade-io :refer [save-trade]]
-            [stockmon3.domain [account :refer [make-account buy sell split get-holdings]]
-             [trade :refer [make-trade]]]
+            [stockmon3.domain 
+             [account :refer [make-account buy sell split get-holdings get-gains]]
+             [trade :refer [make-trade make-split-event]]]
             [stockmon3.domain.id-gen :as id-gen]
             [stockmon3.id-gen-mock :as mock]
             [stockmon3.utils :refer [make-money]]))
@@ -15,8 +16,8 @@
                   save-trade (fn [t] (reset! mock {:trade t}))]
 
       (let [acc (make-account "Knuckleheads" "Fargo account")
-            a-buy (make-trade "2020-12-22" "B" "HDFC" 100 2350.0 "INR" "" (:id acc))
-            a-sale (make-trade "2020-12-24" "S" "HDFC" 100 2000.0 "INR" "liquidate!" (:id acc))]
+            a-buy (make-trade "2020-12-22" "B" "HDFC" 100 2350.0 0 "INR" "" (:id acc))
+            a-sale (make-trade "2020-12-24" "S" "HDFC" 100 2000.0 0 "INR" "liquidate!" (:id acc))]
         (testing "A buy appends to the trades log"
           (buy acc a-buy)
 
@@ -30,6 +31,7 @@
           (is (= "liquidate!" (get-in @mock [:trade :notes]))))))))
     
 
+
 (deftest test-holdings
     ;; mock-out
   (with-redefs [id-gen/get-next-id mock/get-next-id
@@ -37,10 +39,10 @@
 
     (let [acc (make-account "customer" "yada")
           acc-id (:id acc)
-          trade1 (make-trade "2020-12-01" "B" "HDFC" 10 1100 "INR" "" acc-id)
-          trade2 (make-trade "2020-12-12" "B" "HDFC" 20 1000 "INR" "" acc-id)
-          trade3 (make-trade "2020-12-20" "S" "HDFC" 5 1400 "INR" "" acc-id)
-          trade4 (make-trade "2020-12-30" "S" "HDFC" 10 1450 "INR" "" acc-id)]
+          trade1 (make-trade "2020-12-01" "B" "HDFC" 10 1100 0 "INR" "" acc-id)
+          trade2 (make-trade "2020-12-12" "B" "HDFC" 20 1000 0 "INR" "" acc-id)
+          trade3 (make-trade "2020-12-20" "S" "HDFC" 5 1400 5 "INR" "" acc-id)
+          trade4 (make-trade "2020-12-30" "S" "HDFC" 10 1450 10 "INR" "" acc-id)]
 
       (testing "single holding"
         (buy acc trade1)
@@ -89,10 +91,10 @@
 
       (let [acc (make-account "customer" "yada")
             acc-id (:id acc)
-            trade1 (make-trade "2020-12-01" "B" "HDFC" 10 26000 "INR" "" acc-id)
-            trade2 (make-trade "2020-12-12" "B" "HDFC" 20 28000 "INR" "" acc-id)
-            trade3 (make-trade "2020-12-20" "S" "HDFC" 5 22000 "INR" "" acc-id)
-            the-split (make-trade "2020-12-30" "X" "HDFC" 10 0 "INR" "stock splits 1:10" acc-id)]
+            trade1 (make-trade "2020-12-01" "B" "HDFC" 10 26000 10 "INR" "" acc-id)
+            trade2 (make-trade "2020-12-12" "B" "HDFC" 20 28000 20 "INR" "" acc-id)
+            trade3 (make-trade "2020-12-20" "S" "HDFC" 5 22000 30 "INR" "" acc-id)
+            the-split (make-split-event "2020-12-30" "HDFC" 10 "stock splits 1:10" acc-id)]
 
         (-> acc
             (buy trade1)
@@ -106,3 +108,26 @@
           (is (= ["INR 2600.00", "INR 2800.00"] (map #(.toString (:price %)) hdfc-holdings))
               "stock split 1:10 should scale acq price accordingly"))))
     )
+
+(deftest test-gains-calculation
+  (with-redefs [id-gen/get-next-id mock/get-next-id
+                save-trade identity]
+    (let [acc (make-account "customer" "yada")
+          acc-id (:id acc)
+          buy-1 (make-trade "2020-12-01" "B" "BFIN" 25 3700 105.9 "INR" "" acc-id)
+          buy-2 (make-trade "2020-12-12" "B" "BFIN" 25 2370 61.63 "INR" "" acc-id)
+          sale-1 (make-trade "2020-12-20" "S" "BFIN" 30 3650 94.61 "INR" "" acc-id)]
+
+      (-> acc
+          (buy buy-1)
+          (buy buy-2)
+          (sell sale-1))
+
+      (let [gains (get-gains acc)
+            values (map #(-> % :gain .toString) gains)
+            charges (map #(-> % :charges .toString) gains)]
+
+        (is (= '("INR -1434.75" "INR 6371.90") values)
+            "gain from sales incorrect")
+        (is (= '("INR 184.75" "INR 28.10") charges)
+            "deductions/overheads incorrect")))))
