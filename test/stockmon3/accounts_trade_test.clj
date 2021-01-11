@@ -131,3 +131,41 @@
             "gain from sales incorrect")
         (is (= '("INR 184.75" "INR 28.10") charges)
             "deductions/overheads incorrect")))))
+
+
+
+(deftest ^:now defect-test-sales-are-FIFO
+  (with-redefs [id-gen/get-next-id mock/get-next-id
+                save-trade identity]
+
+    (let [acc (make-account "customer" "yada")
+          acc-id (:id acc)
+          trades [(make-trade "2017-08-10" "B" "BFIN" 250 202.00 0 "INR" "" acc-id)
+                  (make-trade "2017-10-13" "B" "BFIN" 150 205.00 0 "INR" "" acc-id)
+                  (make-trade "2018-04-11" "S" "BFIN" 200 240.00 0 "INR" "" acc-id)
+                  (make-trade "2018-07-31" "S" "BFIN" 100 278.00 0 "INR" "" acc-id)
+                  (make-trade "2019-01-24" "B" "BFIN" 150 237.00 0 "INR" "" acc-id)
+                  (make-trade "2019-02-20" "B" "BFIN" 150 199.40 0 "INR" "" acc-id)
+                  (make-trade "2019-04-25" "B" "BFIN" 500 213.95 0 "INR" "" acc-id)
+                  (make-trade "2019-06-18" "B" "BFIN" 250 200.00 0 "INR" "" acc-id)
+                  (make-trade "2020-04-07" "S" "BFIN" 650 138.25 0 "INR" "" acc-id)]]
+
+
+
+      (doall (map #(let [{:keys [type]} %]
+                     (if (= "B" type)
+                       (buy acc %)
+                       (sell acc %)))
+                  trades))
+      (let [gains (get-gains acc)]
+
+        (is (= [[4 2 200]
+                [5 2 50]
+                [5 3 50]
+                [10 3 100]
+                [10 6 150]
+                [10 7 150]
+                [10 8 250]]
+               (map #(vector (:sale-id %) (:buy-id %) (:qty %))
+                    gains))
+            "Trades not matched in FIFO order [SaleId BuyId Qty]")))))

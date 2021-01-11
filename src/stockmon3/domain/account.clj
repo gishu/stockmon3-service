@@ -126,18 +126,22 @@
   (let [{:keys [stock qty]} sale-trade
         stock-holdings (get-in state [:holdings stock :buys])
         result-map (reduce fifo-sale-matcher
-                           {:sale (assoc sale-trade :qty-to-match qty) 
+                           {:sale (assoc sale-trade :qty-to-match qty)
                             :updated-holdings [] :gains []}
                            stock-holdings)
         {:keys [updated-holdings, gains]} result-map
         updated-holdings (filter #(> (:rem-qty %) 0) updated-holdings)
+    ; BUGFIX Seq operations can turn vector -> list flipping insertion point
+        updated-holdings (vec updated-holdings)
         [total-qty, avg-price] (get-average-stats updated-holdings)]
 
-    (-> 
+    (assert (instance? clojure.lang.PersistentVector updated-holdings)
+            "must be a vector to preserve FIFO order")
+
+    (->
      (update-in state [:holdings stock]
                 (constantly {:total-qty total-qty, :avg-price avg-price, :buys updated-holdings}))
-     (update-in [:gains] #(apply conj %1 %2) gains)
-     )))
+     (update-in [:gains] #(apply conj %1 %2) gains))))
 
 (defn- split-holding [holding factor]
   (let [{:keys [rem-qty price]} holding]
