@@ -17,11 +17,12 @@
             repeat)
        (rest csv-data)))
 
-(defn apply-trade [acc record]
+(defn apply-trade [accounts record]
 
-  (let [account-id (:id acc)
+  (let [account-id (Long/parseLong  (:AccountId record))
+        acc (get accounts account-id)
         ts (:Date record)
-
+       
         inst (Instant/parse ts)
         date (-> inst
                  (.atOffset (ZoneOffset/ofHoursMinutes 5 30))
@@ -35,7 +36,7 @@
         brokerage (Double/parseDouble (:Brokerage record))
 
         split-pattern #"STOCK SPLIT 1:(\d+)"]
-    (print record)
+    ;log(print record)
     
     (cond
 
@@ -56,7 +57,8 @@
       :else
       (println "ERR Unknown trade pattern " record))
     
-    (println " <3")))
+    ;log(println " <3")
+    ))
   
 
 (defn -main
@@ -64,21 +66,27 @@
   [& args]
   (println "Hello, Stockmon3")
 
-  (let [acc (make-account "Zerodha" "Gishu's zerodha account")
+  ;; create 3 accounts in data dump
+  (doall (map (fn [[name, desc]]
+                 (-> (make-account name desc)
+                     save-account))
+               [["H", "G's H account"]
+                ["H-M", "M's account"]
+                ["Zero G", "G's trading account"]]))
+  (let [accounts (reduce (fn [map, id] (assoc map id (load-account id)))
+                         {} [1 2 3])]
 
-        account-id (:id acc)]
-    (save-account acc)
-    (let [account (load-account account-id)]
+    (with-open [reader (io/reader "/mnt/share/acc-3-trades.csv")]
+
+      (->> (csv/read-csv reader)
+           csv-data->maps
+           (map #(apply-trade accounts %))
+           doall))
 
 
-      (with-open [reader (io/reader "/mnt/share/acc-3-trades.csv")]
-
-        (->> (csv/read-csv reader)
-             csv-data->maps
-             (map #(apply-trade account %))
-             doall))
-      
-      (save-account account)
-      (println "We done!")
-
-      )))
+    (doall (map (fn [[_, a]]
+                    ;; (println "------------------------------------")
+                    ;; (println (:id  a))
+                    ;; (println (count  (get-gains a)))
+                  (save-account a))  accounts))
+    (println "We done!")))
