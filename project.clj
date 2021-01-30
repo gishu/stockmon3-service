@@ -9,9 +9,13 @@
                  [seancorfield/next.jdbc "1.1.613"]
                  [clojurewerkz/money "1.10.0"]
                  [environ "1.2.0"]
-                 [org.clojure/data.csv "1.0.0"]]
+                 [org.clojure/data.csv "1.0.0"]
+                 [compojure "1.6.2"]
+                 [http-kit "2.5.1"]
+                 [ring/ring-defaults "0.3.2"]
+                 [ring/ring-json "0.5.0"]]
   :plugins [[lein-environ "1.2.0"]]
-  :main ^:skip-aot stockmon3.core
+  :main ^:skip-aot stockmon3.server
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}}
   :test-selectors {:default (complement :integration)
