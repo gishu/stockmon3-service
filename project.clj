@@ -13,7 +13,9 @@
                  [compojure "1.6.2"]
                  [http-kit "2.5.1"]
                  [ring/ring-defaults "0.3.2"]
-                 [ring/ring-json "0.5.0"]]
+                 [ring/ring-json "0.5.0"]
+                 [ring/ring-devel "1.8.2"]
+                 [ring-cors "0.1.13"]]
   :plugins [[lein-environ "1.2.0"]]
   :main ^:skip-aot stockmon3.server
   :target-path "target/%s"

@@ -66,7 +66,7 @@
   [& args]
   (println "Hello, Stockmon3")
 
-  ;; create 3 accounts in data dump
+  ;; create the 3 accounts in data dump
   (doall (map (fn [[name, desc]]
                  (-> (make-account name desc)
                      save-account))
