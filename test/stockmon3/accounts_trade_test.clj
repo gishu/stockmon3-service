@@ -132,9 +132,35 @@
         (is (= '("INR 184.75" "INR 28.10") charges)
             "deductions/overheads incorrect")))))
 
+(deftest ^:now test-defect-distribute-charges-on-split-stocks
+  (with-redefs [id-gen/get-next-id mock/get-next-id
+                save-trade identity]
+    (let [acc (make-account "customer" "yada")
+          acc-id (:id acc)
+          buy-1 (make-trade "2020-12-01" "B" "BFIN" 25 2000 100 "INR" "" acc-id)
+          buy-2 (make-trade "2020-12-12" "B" "BFIN" 25 3000 100 "INR" "" acc-id)
+          the-split (make-split-event "2020-12-30" "BFIN" 10 "stock splits 1:10" acc-id)
 
+          sale-1 (make-trade "2021-01-20" "S" "BFIN" 300 365 100 "INR" "" acc-id)]
 
-(deftest ^:now defect-test-sales-are-FIFO
+      (-> acc
+          (buy buy-1)
+          (buy buy-2)
+          (split the-split)
+          (sell sale-1))
+
+      (let [gains (get-gains acc)
+            values (map #(-> % :gain .toString) gains)
+            charges (map #(-> % :charges .toString) gains)]
+(println gains)
+        (is (= '("INR 183.33" "INR 36.67") charges)
+            "deductions/overheads incorrect")
+        (is (= '("INR 41066.67" "INR 3213.33") values)
+            "gain from sales incorrect")
+        ))))
+
+; a bug caused the vector of buys to be turned into a list, causing new buys to be prepended
+(deftest defect-test-sales-are-FIFO
   (with-redefs [id-gen/get-next-id mock/get-next-id
                 save-trade identity]
 

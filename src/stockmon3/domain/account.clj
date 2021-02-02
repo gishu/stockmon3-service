@@ -88,7 +88,7 @@
             updated-holding (assoc holding :rem-qty (- held-qty matched-qty)
                                    :modified true)
             sale (assoc sale :qty-to-match (- sale-qty matched-qty))
-            {:keys [charges net duration-in-days]} (get-trade-stats updated-holding sale matched-qty)
+            {:keys [charges net duration-in-days]} (get-trade-stats holding sale matched-qty)
             gain {:sale_date (:date sale) :buy-id buy-id :sale-id sale-id :qty matched-qty
                   :charges charges :gain net :duration duration-in-days}]
         
@@ -106,10 +106,10 @@
    then total charges for sale_qty=50 => 50+100"
   [buy-trade sale-trade qty]
 
-  (let [{buy-charges :charges, buy-qty :qty cost-price :price buy-date :date} buy-trade
+  (let [{buy-charges :charges, buy-qty :rem-qty cost-price :price buy-date :date} buy-trade
         {sale-charges :charges, sale-qty :qty sale-price :price sale-date :date} sale-trade
-        charges-on-buy (money/multiply buy-charges (/ qty buy-qty) :up)
-        charges-on-sale (money/multiply sale-charges (/ qty sale-qty) :up)
+        charges-on-buy (money/multiply buy-charges (/ qty buy-qty) :half-up)
+        charges-on-sale (money/multiply sale-charges (/ qty sale-qty) :half-up)
         total-charges (money/plus charges-on-buy charges-on-sale)]
 
     {:charges total-charges
