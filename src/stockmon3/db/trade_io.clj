@@ -6,21 +6,10 @@
             [stockmon3.db.conn :refer [get-db-conn]]
             [stockmon3.domain.trade :refer [map->Trade]]
             [clojurewerkz.money.amounts :as money]
-            [stockmon3.utils :refer [make-money money->dbl money->cur]])
+            [stockmon3.utils :refer [make-money money->dbl money->cur]]
+            [stockmon3.utils.db :refer [mapSqlToTimeTypes]]
+            )
 (:import [java.time Instant]))
-
-(defn- mapSqlToTimeTypes
-  "next.jdbc returns java.sql.* types for date/time fields, which I'd like to 
-   replace with java.time.* types"
-  [map-with-sql-types]
-  (reduce (fn [return-map [k, v]]
-
-            (cond
-              (instance? java.sql.Timestamp v) (assoc return-map k (.toInstant v))
-              (instance? java.sql.Date v) (assoc return-map k (.toLocalDate v))
-              :else (assoc return-map k v)))
-          {}
-          map-with-sql-types))
 
 (defn save-trade [trade]
   (let [{:keys [price charges qty]} trade
