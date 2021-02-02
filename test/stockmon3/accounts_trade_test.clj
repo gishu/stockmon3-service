@@ -132,7 +132,7 @@
         (is (= '("INR 184.75" "INR 28.10") charges)
             "deductions/overheads incorrect")))))
 
-(deftest ^:now test-defect-distribute-charges-on-split-stocks
+(deftest test-defect-distribute-charges-on-split-stocks
   (with-redefs [id-gen/get-next-id mock/get-next-id
                 save-trade identity]
     (let [acc (make-account "customer" "yada")
@@ -150,9 +150,12 @@
           (sell sale-1))
 
       (let [gains (get-gains acc)
+            cost-prices (map #(-> % :cost-price .toString) gains)
             values (map #(-> % :gain .toString) gains)
             charges (map #(-> % :charges .toString) gains)]
-(println gains)
+
+        (is (= '("INR 200.00" "INR 300.00") cost-prices)
+            "cost prices should be updated for stock split")
         (is (= '("INR 183.33" "INR 36.67") charges)
             "deductions/overheads incorrect")
         (is (= '("INR 41066.67" "INR 3213.33") values)

@@ -79,7 +79,7 @@
   (let [{:keys [sale, updated-holdings, gains]} state-map
         sale-qty (:qty-to-match sale)
         sale-id (:id sale)
-        {held-qty :rem-qty, buy-id :id} holding]
+        {held-qty :rem-qty, buy-id :id, cost-price :price} holding]
     
     
     (if (> sale-qty 0)
@@ -89,8 +89,12 @@
                                    :modified true)
             sale (assoc sale :qty-to-match (- sale-qty matched-qty))
             {:keys [charges net duration-in-days]} (get-trade-stats holding sale matched-qty)
-            gain {:sale_date (:date sale) :buy-id buy-id :sale-id sale-id :qty matched-qty
-                  :charges charges :gain net :duration duration-in-days}]
+            gain {:sale_date (:date sale) 
+                  :buy-id buy-id :cost-price cost-price, 
+                  :sale-id sale-id 
+                  :qty matched-qty
+                  :charges charges :gain net 
+                  :duration duration-in-days}]
         
         (assoc state-map :updated-holdings (conj updated-holdings updated-holding)
                :sale sale
