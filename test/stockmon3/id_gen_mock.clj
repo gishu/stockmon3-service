@@ -4,3 +4,6 @@
 
 (defn get-next-id [entity buffer-size]
   (swap! next-id inc))
+
+(defn reset []
+  (reset! next-id 0))

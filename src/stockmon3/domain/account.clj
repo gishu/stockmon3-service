@@ -36,6 +36,7 @@
 (defn split
   "records a stock split event adjusting the stock qty and price"
   [account event]
+
   (save-trade event)
   (swap! (:state account) update-for-split event)
   account
@@ -110,7 +111,7 @@
    then total charges for sale_qty=50 => 50+100"
   [buy-trade sale-trade qty]
 
-  (let [{buy-charges :charges, buy-qty :rem-qty cost-price :price buy-date :date} buy-trade
+  (let [{buy-charges :charges, buy-qty :qty cost-price :price buy-date :date} buy-trade
         {sale-charges :charges, sale-qty :qty sale-price :price sale-date :date} sale-trade
         charges-on-buy (money/multiply buy-charges (/ qty buy-qty) :half-up)
         charges-on-sale (money/multiply sale-charges (/ qty sale-qty) :half-up)
@@ -127,6 +128,7 @@
 
 (defn- update-for-sale [state sale-trade]
   ;;TODO :Check insufficient holdings for sale
+
   (let [{:keys [stock qty]} sale-trade
         stock-holdings (get-in state [:holdings stock :buys])
         result-map (reduce fifo-sale-matcher
@@ -138,7 +140,7 @@
     ; BUGFIX Seq operations can turn vector -> list flipping insertion point
         updated-holdings (vec updated-holdings)
         [total-qty, avg-price] (get-average-stats updated-holdings)]
-
+    
     (assert (instance? clojure.lang.PersistentVector updated-holdings)
             "must be a vector to preserve FIFO order")
 
@@ -148,9 +150,10 @@
      (update-in [:gains] #(apply conj %1 %2) gains))))
 
 (defn- split-holding [holding factor]
-  (let [{:keys [rem-qty price]} holding]
+  (let [{:keys [qty rem-qty price]} holding]
     
     (assoc holding
+           :qty (* qty factor)
            :rem-qty (* rem-qty factor)
            :price (money/divide price factor :floor)
            :modified true)))
@@ -158,9 +161,13 @@
 (defn- update-for-split [state event]
   (let [{stock :stock factor :qty} event
         stock-entry (get-in state [:holdings stock])
-        updated-holdings (map #(split-holding % factor) (:buys stock-entry))
+        updated-holdings (->  (map #(split-holding % factor) (:buys stock-entry))
+                              vec)
         [total-qty, avg-price] (get-average-stats updated-holdings)]
 
+    (assert (instance? clojure.lang.PersistentVector updated-holdings)
+            "must be a vector to preserve FIFO order")
+    
     (update-in state [:holdings stock]
                (constantly
                 {:total-qty total-qty :avg-price avg-price :buys updated-holdings}))))

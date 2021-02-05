@@ -2,6 +2,7 @@ CREATE TABLE st3.profit_n_loss (
     id serial PRIMARY KEY, 
     account_id integer, 
     sale_date DATE NOT NULL, buy_id integer, sale_id integer,
+	cost_price numeric(12,2),
     qty integer NOT NULL,
     charges numeric(12,2) NOT NULL, gain numeric(12,2) NOT NULL, currency char(3) NOT NULL,
     duration_days integer,
@@ -11,7 +12,7 @@ CONSTRAINT fk_sale FOREIGN KEY(sale_id) REFERENCES st3.trades(id));
 --;;
 CREATE VIEW st3.vw_pnl_report AS
 (select gains.id, gains.account_id, gains.sale_date, b.stock, 
-	gains.qty, b.price cost_price, s.price sale_price, 
+	gains.qty, gains.cost_price, s.price sale_price, 
 	(gains.qty * b.price) tco,
 	gains.charges, gain, gains.currency, duration_days, 
 	CASE 

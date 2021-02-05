@@ -1,12 +1,12 @@
 (ns stockmon3.db.account-io-test
   (:require [clojure.test :refer :all]
             [ragtime.repl :as repl]
-            [stockmon3.db.account-io :refer [save-account load-account]]
+            [stockmon3.db.account-io :refer [save-account load-account query-pnl-register]]
             [stockmon3.domain.account :refer [make-account 
                                               get-holdings get-gains
                                               buy sell split]]
-            [stockmon3.domain.trade :refer [make-trade make-split-event]]
             [stockmon3.domain.id-gen :as id-gen]
+            [stockmon3.domain.trade :refer [make-trade make-split-event]]
             [stockmon3.migrations :refer [config]]
             [stockmon3.utils :refer [make-money money->dbl]]))
 
@@ -173,8 +173,42 @@
             "shoud have loaded old 2 + 1 new gain entries now")
         (is (= '(25 5 20) (map :qty gains)))
         
-        (is (= '("INR -1434.75" "INR 6371.90" "INR 36841.69") profits)
+        (is (= '("INR -1434.74" "INR 6371.90" "INR 36841.70") profits)
             "gains not persisted correctly")
-        (is (= '("INR 184.75" "INR 28.10" "INR 158.31") charges)
+        (is (= '("INR 184.74" "INR 28.10" "INR 158.30") charges)
             "overheads/charges not persisted correctly")
         ))))
+
+(deftest ^:integration account-gains-record-effective-cost-price-for-split-stocks
+  (let [acc (make-account "customer" "yada")
+        acc-id (:id acc)
+        buy-1 (make-trade "2020-12-01" "B" "BFIN" 25 2000 100 "INR" "" acc-id)
+        buy-2 (make-trade "2020-12-12" "B" "BFIN" 25 3000 100 "INR" "" acc-id)
+        the-split (make-split-event "2020-12-30" "BFIN" 10 "stock splits 1:10" acc-id)
+
+        sale-1 (make-trade "2021-01-20" "S" "BFIN" 300 365 100 "INR" "" acc-id)]
+    (testing "effective cost-price is persisted with each gain e.g. stock-split adjusted price"
+
+      (save-account acc)
+
+      (-> (load-account 1)
+          (buy buy-1)
+          (buy buy-2)
+          (split the-split)
+          (sell sale-1)
+          save-account)
+
+
+      (let [account (load-account 1)
+            gains (get-gains account)
+            cost-prices (map #(-> % :cost-price .toString) gains)]
+
+        (is (= '("INR 200.00" "INR 300.00") cost-prices)
+            "after 1:10 stock split, cost-price for the sale should be price/10")))
+
+    (testing "reports also show the effective cost-price, not the original "
+      (let [gains (query-pnl-register 1 2020)
+            cost-prices (map #(-> % :cost_price) gains)]
+
+        (is (= '(200.00, 300.00) cost-prices)
+            "effective prices should be actual cost-price / 10")))))

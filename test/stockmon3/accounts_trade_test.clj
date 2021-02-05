@@ -6,7 +6,7 @@
              [trade :refer [make-trade make-split-event]]]
             [stockmon3.domain.id-gen :as id-gen]
             [stockmon3.id-gen-mock :as mock]
-            [stockmon3.utils :refer [make-money]]))
+            [stockmon3.utils :refer [make-money money->dbl]]))
 
 
 (deftest test-any-trade-is-recorded
@@ -127,12 +127,12 @@
             values (map #(-> % :gain .toString) gains)
             charges (map #(-> % :charges .toString) gains)]
 
-        (is (= '("INR -1434.75" "INR 6371.90") values)
+        (is (= '("INR -1434.74" "INR 6371.90") values)
             "gain from sales incorrect")
-        (is (= '("INR 184.75" "INR 28.10") charges)
+        (is (= '("INR 184.74" "INR 28.10") charges)
             "deductions/overheads incorrect")))))
 
-(deftest test-defect-distribute-charges-on-split-stocks
+(deftest defect-test-gains-on-split-stocks
   (with-redefs [id-gen/get-next-id mock/get-next-id
                 save-trade identity]
     (let [acc (make-account "customer" "yada")
@@ -164,6 +164,9 @@
 
 ; a bug caused the vector of buys to be turned into a list, causing new buys to be prepended
 (deftest defect-test-sales-are-FIFO
+  ; this test needs deterministic trade ids for verification
+  (mock/reset)
+  
   (with-redefs [id-gen/get-next-id mock/get-next-id
                 save-trade identity]
 
@@ -198,3 +201,27 @@
                (map #(vector (:sale-id %) (:buy-id %) (:qty %))
                     gains))
             "Trades not matched in FIFO order [SaleId BuyId Qty]")))))
+
+(deftest ^:now defect-post-split-test-sales-are-FIFO
+
+  (with-redefs [id-gen/get-next-id mock/get-next-id
+                save-trade identity]
+    (let [acc (make-account "customer" "yada")
+          acc-id (:id acc)]
+
+      (doall (map #(buy acc %)
+                  [(make-trade "2019-08-22" "B" "BFIN" 25 2200.00 0 "INR" "" acc-id)
+                   (make-trade "2019-08-26" "B" "BFIN" 25 2172.15 0 "INR" "" acc-id)]))
+      (split acc  (make-split-event "2019-08-26"
+                                    "BFIN"
+                                    (Long/parseLong "2")
+                                    "STOCK SPLIT 1:2"
+                                    acc-id))
+      (buy acc (make-trade "2020-09-11" "B" "BFIN" 50 1075.00 0 "INR" "" acc-id))
+      (sell acc (make-trade "2020-11-09" "S" "BFIN" 50 1340.00 0 "INR" "" acc-id))
+
+      (let [gains  (get-gains acc)
+            profits (map #(-> % :gain money->dbl) gains)]
+        ; sale should match up with first trades 50@1100
+        (is (= '(12000.0) profits))
+        ))))
