@@ -22,7 +22,7 @@
   (let [account-id (Long/parseLong  (:AccountId record))
         acc (get accounts account-id)
         ts (:Date record)
-       
+
         inst (Instant/parse ts)
         date (-> inst
                  (.atOffset (ZoneOffset/ofHoursMinutes 5 30))
@@ -36,29 +36,30 @@
         brokerage (Double/parseDouble (:Brokerage record))
 
         split-pattern #"STOCK SPLIT 1:(\d+)"]
-    ;log(print record)
-    
+
+    ;log (print record)
+
     (cond
 
       (= "0" (:Price record))
       (when-let [[[_, factor]] (re-seq split-pattern notes)]
 
         (split acc  (make-split-event date
-                                    stock
-                                    (Long/parseLong factor)
-                                    (:Notes record)
-                                    account-id)))
+                                      stock
+                                      (Long/parseLong factor)
+                                      (:Notes record)
+                                      account-id)))
       (= "B" type)
-      (let []
-        (buy acc (make-trade date "B" stock qty price brokerage "INR" notes account-id)))
+      (buy acc (make-trade date "B" stock qty price brokerage "INR" notes account-id))
+
       (= "S" type)
-      (let []
-        (sell acc (make-trade date "S" stock qty price brokerage "INR" notes account-id)))
+      (sell acc (make-trade date "S" stock qty price brokerage "INR" notes account-id))
+
       :else
-      (println "ERR Unknown trade pattern " record))
-    
+      (println "ERR Unknown trade pattern " record)))
+
     ;log(println " <3")
-    ))
+    )
   
 
 (defn -main
@@ -77,6 +78,9 @@
                          {} [1 2 3])]
 
     (with-open [reader (io/reader "/mnt/share/acc-3-trades.csv")]
+
+      ; @*#&^@#*^@ BOM character  - https://github.com/clojure/data.csv#byte-order-mark
+      (.skip reader 1)
 
       (->> (csv/read-csv reader)
            csv-data->maps

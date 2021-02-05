@@ -102,23 +102,27 @@
 (defn- load-gains [db account-id]
   (let [rows (sql/query db ["select * from st3.profit_n_loss where account_id = ? order by id" account-id])]
     (->> rows
-         (map #(let [{:keys [charges gain currency]} %]
+         (map #(let [{:keys [cost_price charges gain currency]} %]
                  (-> %
-                     (assoc :charges (make-money charges currency)
+                     (assoc :cost_price (make-money cost_price currency)
+                            :charges (make-money charges currency)
                             :gain (make-money gain currency))
                      (dissoc :currency :duration_days))))
          (map #(rename-keys % {:account_id :account-id
                                :buy_id :buy-id
-                               :sale_id :sale-id}))
+                               :sale_id :sale-id
+                               :cost_price :cost-price}))
          (map mapSqlToTimeTypes)
          (into []))))
 
 (defn- save-gains [db gains account-id]
   
   (let [to-insert (filter #((complement :id) %) gains)
-        rows-to-insert (map #(let [{:keys [sale_date buy-id sale-id qty charges gain duration]} %]
+        rows-to-insert (map #(let [{:keys [sale_date buy-id sale-id cost-price qty charges gain duration]} %]
                                [account-id 
-                                sale_date buy-id sale-id qty
+                                sale_date buy-id sale-id 
+                                (money->dbl cost-price)
+                                qty
                                 (money->dbl charges)
                                 (money->dbl gain)
                                 (money->cur gain)
@@ -126,34 +130,27 @@
                             to-insert)]
 
     (sql/insert-multi! db :st3.profit_n_loss
-                       [:account_id :sale_date :buy_id :sale_id :qty :charges :gain :currency :duration_days]
+                       [:account_id :sale_date :buy_id :sale_id :cost_price :qty :charges :gain :currency :duration_days]
                        rows-to-insert)))
-
+(declare get-cagr)
 (defn query-pnl-register [account-id year]
   (let [db (get-db-conn)
         range-start (LocalDate/of year 4 1)
         range-end (LocalDate/of (inc year) 3 31)
-        rows (jdbc/execute! db ["select * from st3.vw_pnl_report where account_id = ? and sale_date between ? and ? " 
+        rows (jdbc/execute! db ["select * from st3.vw_pnl_report where account_id = ? and sale_date between ? and ? "
                                 account-id range-start range-end])]
-    
+
     (->> rows
          (map mapSqlToTimeTypes)
          (map #(let [{:keys [id sale_date stock, qty, cost_price, sale_price, charges, gain, currency, duration_days, age]} %
-                     tco (->> (BigDecimal. qty) (.multiply cost_price))
+                     tco (->> (BigDecimal. qty) 
+                              (.multiply cost_price))
                      gain_percent (if (= BigDecimal/ZERO tco)
                                     BigDecimal/ZERO
                                     (.divide gain tco 4 BigDecimal/ROUND_HALF_EVEN))
-                     cagr  (if (= BigDecimal/ZERO cost_price)
-                             BigDecimal/ZERO
-                             (->
-                              (.divide sale_price cost_price 4 BigDecimal/ROUND_HALF_EVEN)
-                              (.doubleValue)
-                              (Math/pow (/ 1 (/ duration_days 365)))
-                              (- 1)
-                              (BigDecimal/valueOf)
-                              (.setScale 4 BigDecimal/ROUND_HALF_EVEN)))]
-                 
-                
+                     cagr  (get-cagr %)]
+
+
                  {:id id
                   :sale_date (.toString  sale_date)
                   :stock stock
@@ -166,8 +163,16 @@
                   :duration_days duration_days
                   :type age
                   :gain_percent (.doubleValue gain_percent)
-                  :cagr (.doubleValue  cagr)})
-              ))
-    
-    )
-  )
+                  :cagr (.doubleValue  cagr)})))))
+
+(defn get-cagr [gain]
+  (let [{:keys [cost_price sale_price duration_days]} gain]
+    (if (= BigDecimal/ZERO cost_price)
+      BigDecimal/ZERO
+      (->
+       (.divide sale_price cost_price 4 BigDecimal/ROUND_HALF_EVEN)
+       (.doubleValue)
+       (Math/pow (/ 1 (/ duration_days 365)))
+       (- 1)
+       (BigDecimal/valueOf)
+       (.setScale 4 BigDecimal/ROUND_HALF_EVEN)))))
