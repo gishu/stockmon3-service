@@ -1,7 +1,8 @@
 (ns stockmon3.domain.account
   (:require [clojurewerkz.money.amounts :as money]
             [stockmon3.db.trade-io :refer [save-trade]]
-            [stockmon3.domain.id-gen :refer [get-next-id]])
+            [stockmon3.domain.id-gen :refer [get-next-id]]
+            [stockmon3.domain.trade :refer [make-trade make-split-event]])
   (:import java.time.temporal.ChronoUnit))
 
 (defrecord Account [id name description state])
@@ -40,6 +41,33 @@
   (save-trade event)
   (swap! (:state account) update-for-split event)
   account
+  )
+
+(defn apply-trades [account trades]
+  (doseq [record trades]
+
+    (let [account-id (:id account)
+          split-pattern #"STOCK SPLIT 1:(\d+)"
+          {:keys [date type stock qty price brokerage currency notes]} record]
+
+      (cond
+
+        (= 0 price)
+        (when-let [[[_, factor]] (re-seq split-pattern notes)]
+
+          (split account  (make-split-event date
+                                            stock
+                                            (Long/parseLong factor)
+                                            notes
+                                            account-id)))
+        (= "B" type)
+        (buy account (make-trade date "B" stock qty price brokerage currency notes account-id))
+
+        (= "S" type)
+        (sell account (make-trade date "S" stock qty price brokerage currency notes account-id))
+
+        :else
+        (println "ERR Unknown trade pattern " record))))
   )
 
 (defn get-average-stats 
