@@ -4,18 +4,11 @@
           [stockmon3.db.account-io :refer [load-account save-account]]
           [stockmon3.domain
            [account :refer [make-account buy sell split get-holdings get-gains]]
-           [trade :refer [make-trade make-split-event]]])
+           [trade :refer [make-trade make-split-event]]]
+          [stockmon3.utils :refer [csv-data->maps]])
   (:import [java.time Instant ZoneOffset])
   (:gen-class))
 
-(defn csv-data->maps 
-  "Return the csv records as a vector of maps"
-  [csv-data]
-  (map zipmap
-       (->> (first csv-data) ;; First row is the header
-            (map keyword) ;; Drop if you want string keys instead
-            repeat)
-       (rest csv-data)))
 
 (defn apply-trade [accounts record]
 
@@ -38,10 +31,10 @@
         split-pattern #"STOCK SPLIT 1:(\d+)"]
 
     ;log (print record)
-
+    
     (cond
 
-      (= "0" (:Price record))
+      (and  (= 0.0 price) (re-seq split-pattern notes))
       (when-let [[[_, factor]] (re-seq split-pattern notes)]
 
         (split acc  (make-split-event date
@@ -60,10 +53,9 @@
 
     ;log(println " <3")
     )
-  
 
 (defn -main
-  "I don't do a whole lot ... yet."
+  "Seed the db with past trades"
   [& args]
   (println "Hello, Stockmon3")
 

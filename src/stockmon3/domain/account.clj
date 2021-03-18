@@ -43,16 +43,17 @@
   account
   )
 
-(defn apply-trades [account trades]
+(defn apply-trades
+  "Bulk insert of trades to multiple accounts. Mark stock split events with a note [STOCK SPLIT 1:10]"
+  [account trades]
   (doseq [record trades]
 
     (let [account-id (:id account)
           split-pattern #"STOCK SPLIT 1:(\d+)"
           {:keys [date type stock qty price brokerage currency notes]} record]
-
       (cond
-
-        (= 0 price)
+        ; stock split event
+        (and (= 0 price) (re-seq split-pattern notes))
         (when-let [[[_, factor]] (re-seq split-pattern notes)]
 
           (split account  (make-split-event date
@@ -67,8 +68,7 @@
         (sell account (make-trade date "S" stock qty price brokerage currency notes account-id))
 
         :else
-        (println "ERR Unknown trade pattern " record))))
-  )
+        (println "ERR Unknown trade pattern " record)))))
 
 (defn get-average-stats 
   "Returns a vector [total # of shares, avg price] given a collection of holdings"

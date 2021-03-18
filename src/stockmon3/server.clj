@@ -8,7 +8,9 @@
             [ring.middleware.json :refer [wrap-json-response wrap-json-body]]
             [ring.middleware.reload :as reload]
             [ring.util.response :refer :all]
-            [stockmon3.domain.account :refer [apply-trades]]
+            [stockmon3.domain.account :as account]
+            [stockmon3.utils :refer [money->dbl]]
+            [stockmon3.domain.quotes :refer [load-quotes-map]]
             [stockmon3.db.account-io :refer [load-account save-account query-pnl-register]]))
 
 (declare get-account-by-id get-year-from get-account-id-from 
@@ -45,7 +47,7 @@
           account (load-account account-id)
           trades (get-in request [:body :trades])]
 
-      (apply-trades account trades)
+      (account/apply-trades account trades)
       (save-account account)
 
       (response {:result "OK"}))
@@ -56,11 +58,53 @@
                             :headers {"Content-Type" "application/json; charset=utf-8"}
                             :body {:error error}}))))
 
+(defn- serialize-money2 [holding]
+  (let [{:keys [date rem-qty price charges notes]} holding]
+    {:date (.toString date)
+     :qty rem-qty
+     :price (money->dbl price)
+     :charges (money->dbl charges)
+     :notes notes}))
+
+(defn- serialize-money 
+  "Money instances are not JSON-encodable by ring"
+  [[stock holding-info]]
+  (let [{:keys [total-qty avg-price buys]} holding-info]
+    (vector stock {:total-qty total-qty
+                   :avg-price (money->dbl avg-price)
+                   :buys (map serialize-money2 buys)
+                   }))
+  )
+
+(defn get-holdings [request]
+  (try
+    (let [account-id (get-account-id-from request)
+          account (load-account account-id)
+          holdings (account/get-holdings account)]
+
+      (response  {:data (into {} (map serialize-money holdings))}))
+    (catch NumberFormatException _
+      (bad-request "Error: Account id must be numeric."))
+    (catch Exception ex  (let [error (.getMessage ex)]
+                           (prn error)
+                           {:status 500
+                            :headers {"Content-Type" "application/json; charset=utf-8"}
+                            :body {:error error}}))))
+
+(defn get-quotes [request]
+  (let [symbols (get-in request [:body :symbols])
+        latest-quotes (load-quotes-map)]
+    
+    (response {:quotes
+               (reduce #(assoc %1 %2 (get latest-quotes %2 0)) {} symbols)})))
+
 (defroutes my-routes
 
   (GET "/accounts/:id" []  get-account)
   (GET "/accounts/:id/gains/:year" [] get-gains)
-  (POST "/accounts/:id/trades" [] post-trades ))
+  (GET "/accounts/:id/holdings" [] get-holdings)
+  (POST "/accounts/:id/trades" [] post-trades )
+  (POST "/quotes" [] get-quotes ))
 
 (def app (-> my-routes
              wrap-json-response
