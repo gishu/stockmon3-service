@@ -11,7 +11,8 @@
             [stockmon3.domain.account :as account]
             [stockmon3.utils :refer [money->dbl]]
             [stockmon3.domain.quotes :refer [load-quotes-map]]
-            [stockmon3.db.account-io :refer [load-account save-account query-pnl-register]]))
+            [stockmon3.db.account-io :refer [load-account save-account query-pnl-register]])
+  (:gen-class))
 
 (declare get-account-by-id get-year-from get-account-id-from 
          post-trade)
@@ -110,7 +111,7 @@
              wrap-json-response
              (wrap-json-body {:keywords? true})
              (wrap-defaults  api-defaults)
-             (wrap-cors :access-control-allow-origin [#"http://localhost:4200"]
+             (wrap-cors :access-control-allow-origin [#"st3-ui"]
                         :access-control-allow-methods [:get :post])
              ))
 
