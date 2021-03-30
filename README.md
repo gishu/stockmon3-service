@@ -44,7 +44,7 @@ option) any later version, with the GNU Classpath Exception which is available
 at https://www.gnu.org/software/classpath/license.html.
 
 
-Schema Migrations
+# Schema Migrations
 
 ```clojure
 ;Schema up
@@ -56,9 +56,55 @@ Schema Migrations
     (repl/rollback mig/config total-migrations))
 ```
 
-Backup
-pg_dump [DBName] > outfile.dmp
+# DB 
 
-Restore
-psql -U [username] -d [DBName] < outfile.dmp
+## Backup
+`pg_dump [DBName] > outfile.dmp`
+
+## Restore
+`psql -U [username] -d [DBName] < outfile.dmp`
  
+# Docker
+```
+# Build the images from within the folders containing the Dockerfile
+docker image build --tag mx-postgres:latest .
+
+
+docker network create \
+  --driver bridge \
+  --label project=stockmon3 \
+  --attachable \
+  --scope local \
+  --subnet 10.0.42.0/24 \
+  --ip-range 10.0.42.128/25 \
+  stockmon3-network
+
+
+docker run -d \
+    --name st3-pgsql \
+    --network stockmon3-network \
+    -e POSTGRES_DB=kaching \
+    -e POSTGRES_USER=gishu \
+    -e POSTGRES_PASSWORD=supersecretpwd \
+    -e PGDATA=/var/lib/postgresql/data/pgdata \
+    -v ~/dockervol/st3-data:/var/lib/postgresql/data \
+    postgres-mx
+
+
+docker run -d \
+    --name st3-svc \
+    --network stockmon3-network \
+    -p 8123:8000 \
+    -e STOCKMON_DB_HOST=st3-pgsql \
+    -e STOCKMON_DB=kaching \
+    -e STOCKMON_DB_USER=gishu \
+    -e STOCKMON_DB_PWD=supersecretpwd \
+    st3-service
+
+docker run -d \
+    --name st3-ui \
+    --network stockmon3-network \
+    -p 8888:80 \
+    st3-ui
+
+```

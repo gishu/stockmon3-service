@@ -1,0 +1,307 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 13.2 (Ubuntu 13.2-1.pgdg20.04+1)
+-- Dumped by pg_dump version 13.2 (Ubuntu 13.2-1.pgdg20.04+1)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: st3; Type: SCHEMA; Schema: -; Owner: gishu
+--
+
+CREATE SCHEMA st3;
+
+
+ALTER SCHEMA st3 OWNER TO gishu;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: ragtime_migrations; Type: TABLE; Schema: public; Owner: gishu
+--
+
+CREATE TABLE public.ragtime_migrations (
+    id character varying(255),
+    created_at character varying(32)
+);
+
+
+ALTER TABLE public.ragtime_migrations OWNER TO gishu;
+
+--
+-- Name: accounts; Type: TABLE; Schema: st3; Owner: gishu
+--
+
+CREATE TABLE st3.accounts (
+    id integer NOT NULL,
+    name character varying(20),
+    description character varying(30),
+    created_at timestamp with time zone
+);
+
+
+ALTER TABLE st3.accounts OWNER TO gishu;
+
+--
+-- Name: holdings; Type: TABLE; Schema: st3; Owner: gishu
+--
+
+CREATE TABLE st3.holdings (
+    id integer NOT NULL,
+    account_id integer,
+    buy_id integer,
+    rem_qty integer,
+    price numeric(12,2),
+    currency character varying(3)
+);
+
+
+ALTER TABLE st3.holdings OWNER TO gishu;
+
+--
+-- Name: holdings_id_seq; Type: SEQUENCE; Schema: st3; Owner: gishu
+--
+
+CREATE SEQUENCE st3.holdings_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE st3.holdings_id_seq OWNER TO gishu;
+
+--
+-- Name: holdings_id_seq; Type: SEQUENCE OWNED BY; Schema: st3; Owner: gishu
+--
+
+ALTER SEQUENCE st3.holdings_id_seq OWNED BY st3.holdings.id;
+
+
+--
+-- Name: keys; Type: TABLE; Schema: st3; Owner: gishu
+--
+
+CREATE TABLE st3.keys (
+    entity character varying(20) NOT NULL,
+    next_id integer
+);
+
+
+ALTER TABLE st3.keys OWNER TO gishu;
+
+--
+-- Name: profit_n_loss; Type: TABLE; Schema: st3; Owner: gishu
+--
+
+CREATE TABLE st3.profit_n_loss (
+    id integer NOT NULL,
+    account_id integer,
+    sale_date date NOT NULL,
+    buy_id integer,
+    sale_id integer,
+    cost_price numeric(12,2),
+    qty integer NOT NULL,
+    charges numeric(12,2) NOT NULL,
+    gain numeric(12,2) NOT NULL,
+    currency character(3) NOT NULL,
+    duration_days integer
+);
+
+
+ALTER TABLE st3.profit_n_loss OWNER TO gishu;
+
+--
+-- Name: profit_n_loss_id_seq; Type: SEQUENCE; Schema: st3; Owner: gishu
+--
+
+CREATE SEQUENCE st3.profit_n_loss_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE st3.profit_n_loss_id_seq OWNER TO gishu;
+
+--
+-- Name: profit_n_loss_id_seq; Type: SEQUENCE OWNED BY; Schema: st3; Owner: gishu
+--
+
+ALTER SEQUENCE st3.profit_n_loss_id_seq OWNED BY st3.profit_n_loss.id;
+
+
+--
+-- Name: trades; Type: TABLE; Schema: st3; Owner: gishu
+--
+
+CREATE TABLE st3.trades (
+    id integer NOT NULL,
+    account_id integer,
+    trade_date date NOT NULL,
+    type character(1) NOT NULL,
+    stock character varying(20) NOT NULL,
+    qty integer NOT NULL,
+    price numeric(12,2) NOT NULL,
+    charges numeric(12,2) NOT NULL,
+    currency character(3) NOT NULL,
+    trade_value numeric(12,2) NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    notes character varying(30)
+);
+
+
+ALTER TABLE st3.trades OWNER TO gishu;
+
+--
+-- Name: vw_pnl_report; Type: VIEW; Schema: st3; Owner: gishu
+--
+
+CREATE VIEW st3.vw_pnl_report AS
+ SELECT gains.id,
+    gains.account_id,
+    gains.sale_date,
+    b.stock,
+    gains.qty,
+    gains.cost_price,
+    s.price AS sale_price,
+    ((gains.qty)::numeric * b.price) AS tco,
+    gains.charges,
+    gains.gain,
+    gains.currency,
+    gains.duration_days,
+        CASE
+            WHEN (gains.duration_days >= 365) THEN 'LT'::text
+            ELSE 'ST'::text
+        END AS age
+   FROM ((st3.profit_n_loss gains
+     JOIN st3.trades b ON ((gains.buy_id = b.id)))
+     JOIN st3.trades s ON ((gains.sale_id = s.id)))
+  ORDER BY gains.id;
+
+
+ALTER TABLE st3.vw_pnl_report OWNER TO gishu;
+
+--
+-- Name: holdings id; Type: DEFAULT; Schema: st3; Owner: gishu
+--
+
+ALTER TABLE ONLY st3.holdings ALTER COLUMN id SET DEFAULT nextval('st3.holdings_id_seq'::regclass);
+
+
+--
+-- Name: profit_n_loss id; Type: DEFAULT; Schema: st3; Owner: gishu
+--
+
+ALTER TABLE ONLY st3.profit_n_loss ALTER COLUMN id SET DEFAULT nextval('st3.profit_n_loss_id_seq'::regclass);
+
+
+--
+-- Name: accounts accounts_pkey; Type: CONSTRAINT; Schema: st3; Owner: gishu
+--
+
+ALTER TABLE ONLY st3.accounts
+    ADD CONSTRAINT accounts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: holdings holdings_pkey; Type: CONSTRAINT; Schema: st3; Owner: gishu
+--
+
+ALTER TABLE ONLY st3.holdings
+    ADD CONSTRAINT holdings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: keys keys_pkey; Type: CONSTRAINT; Schema: st3; Owner: gishu
+--
+
+ALTER TABLE ONLY st3.keys
+    ADD CONSTRAINT keys_pkey PRIMARY KEY (entity);
+
+
+--
+-- Name: profit_n_loss profit_n_loss_pkey; Type: CONSTRAINT; Schema: st3; Owner: gishu
+--
+
+ALTER TABLE ONLY st3.profit_n_loss
+    ADD CONSTRAINT profit_n_loss_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: trades trades_pkey; Type: CONSTRAINT; Schema: st3; Owner: gishu
+--
+
+ALTER TABLE ONLY st3.trades
+    ADD CONSTRAINT trades_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: trades fk_account; Type: FK CONSTRAINT; Schema: st3; Owner: gishu
+--
+
+ALTER TABLE ONLY st3.trades
+    ADD CONSTRAINT fk_account FOREIGN KEY (account_id) REFERENCES st3.accounts(id);
+
+
+--
+-- Name: holdings fk_account; Type: FK CONSTRAINT; Schema: st3; Owner: gishu
+--
+
+ALTER TABLE ONLY st3.holdings
+    ADD CONSTRAINT fk_account FOREIGN KEY (account_id) REFERENCES st3.accounts(id);
+
+
+--
+-- Name: profit_n_loss fk_account; Type: FK CONSTRAINT; Schema: st3; Owner: gishu
+--
+
+ALTER TABLE ONLY st3.profit_n_loss
+    ADD CONSTRAINT fk_account FOREIGN KEY (account_id) REFERENCES st3.accounts(id);
+
+
+--
+-- Name: profit_n_loss fk_buy; Type: FK CONSTRAINT; Schema: st3; Owner: gishu
+--
+
+ALTER TABLE ONLY st3.profit_n_loss
+    ADD CONSTRAINT fk_buy FOREIGN KEY (buy_id) REFERENCES st3.trades(id);
+
+
+--
+-- Name: profit_n_loss fk_sale; Type: FK CONSTRAINT; Schema: st3; Owner: gishu
+--
+
+ALTER TABLE ONLY st3.profit_n_loss
+    ADD CONSTRAINT fk_sale FOREIGN KEY (sale_id) REFERENCES st3.trades(id);
+
+
+--
+-- Name: holdings fk_trades; Type: FK CONSTRAINT; Schema: st3; Owner: gishu
+--
+
+ALTER TABLE ONLY st3.holdings
+    ADD CONSTRAINT fk_trades FOREIGN KEY (buy_id) REFERENCES st3.trades(id);
+
+
+--
+-- PostgreSQL database dump complete
+--
+
