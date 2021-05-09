@@ -176,3 +176,25 @@
        (- 1)
        (BigDecimal/valueOf)
        (.setScale 4 BigDecimal/ROUND_HALF_EVEN)))))
+
+(defn get-dividends
+  "report the annual dividends received for an account"
+  [account-id year]
+  (let [db (get-db-conn)
+        range-start (LocalDate/of year 4 1)
+        range-end (LocalDate/of (inc year) 3 31)
+        rows (jdbc/execute! db ["select * from st3.dividends where account_id = ? and date between ? and ? order by date"
+                                account-id range-start range-end])]
+
+    (->> rows
+         (map mapSqlToTimeTypes)
+         (map #(let [{:keys [id date stock, amount, currency, notes]} %]
+
+                 {:id id
+                  :date (.toString date)
+                  :stock stock
+                  :amount (.doubleValue amount)
+                  :currency currency
+                  :notes notes
+                  }
+                 )))))
