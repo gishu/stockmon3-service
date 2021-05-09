@@ -11,7 +11,7 @@
             [stockmon3.domain.account :as account]
             [stockmon3.utils :refer [money->dbl]]
             [stockmon3.domain.quotes :refer [load-quotes-map]]
-            [stockmon3.db.account-io :refer [load-account save-account query-pnl-register]])
+            [stockmon3.db.account-io :refer [load-account save-account query-pnl-register] :as account-io])
   (:gen-class))
 
 (declare get-account-by-id get-year-from get-account-id-from 
@@ -37,6 +37,19 @@
           formatted-gains (query-pnl-register account-id year)]
 
       (response  {:data formatted-gains}))
+    (catch NumberFormatException _
+      (bad-request "Error: Account id must be numeric."))
+    (catch IllegalArgumentException ae
+      (bad-request (.getMessage ae)))))
+
+(defn get-dividends [request]
+
+  (try
+    (let [account-id (get-account-id-from request)
+          year (get-year-from request)
+          dividends (account-io/get-dividends account-id year)]
+
+      (response  {:data dividends}))
     (catch NumberFormatException _
       (bad-request "Error: Account id must be numeric."))
     (catch IllegalArgumentException ae
@@ -103,6 +116,7 @@
 
   (GET "/accounts/:id" []  get-account)
   (GET "/accounts/:id/gains/:year" [] get-gains)
+  (GET "/accounts/:id/dividends/:year" [] get-dividends)
   (GET "/accounts/:id/holdings" [] get-holdings)
   (POST "/accounts/:id/trades" [] post-trades )
   (POST "/quotes" [] get-quotes ))
