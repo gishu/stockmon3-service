@@ -1,6 +1,7 @@
 (ns stockmon3.domain.account
   (:require [clojurewerkz.money.amounts :as money]
             [stockmon3.db.trade-io :refer [save-trade]]
+            [stockmon3.db.dividend-io :refer [save-dividend]]
             [stockmon3.domain.id-gen :refer [get-next-id]]
             [stockmon3.domain.trade :refer [make-trade make-split-event]])
   (:import java.time.temporal.ChronoUnit))
@@ -33,6 +34,11 @@
   (save-trade trade)
   (swap! (:state account) update-for-sale trade)
   account)
+
+(defn add-dividend
+  "records a dividend received for a holding in this account"
+  [div]
+  (save-dividend div))
 
 (defn split
   "records a stock split event adjusting the stock qty and price"
