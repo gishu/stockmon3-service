@@ -5,6 +5,7 @@
   (:import java.time.LocalDate))
 
   (defrecord Trade [id date type stock qty price charges notes account-id])
+  (defrecord Dividend [id date stock amount notes account-id])
 
   (defn make-trade [date type stock qty price charges currency notes account-id]
     (let [validated-type (some #{"B" "S" "X"} [type])]
@@ -30,6 +31,17 @@
       (throw (IllegalArgumentException. "factor argument must be a long value")))
     
     (make-trade date "X" stock factor 0 0.0 "INR" notes account-id ))
+  
+  ;id date stock amount notes account-id
+  (defn make-dividend [date stock amount currency notes account-id]
+    
+    (->Dividend (get-next-id :dividend 1)
+                (LocalDate/parse date)
+                stock
+                (make-money amount currency)
+                notes
+                account-id)
+    )
 
 
 

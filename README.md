@@ -1,14 +1,12 @@
 # stockmon3
 
-FIXME: description
+Gishu's stock monitor
 
 ## Installation
 
 Download from http://example.com/FIXME.
 
 ## Usage
-
-FIXME: explanation
 
     $ java -jar stockmon3-0.1.0-standalone.jar [args]
 
@@ -48,6 +46,7 @@ at https://www.gnu.org/software/classpath/license.html.
 
 ```clojure
 ;Schema up
+; add :reload if already loaded once
 (require '[stockmon3.migrations :as mig] '[ragtime.repl :as repl])
 (repl/migrate mig/config)
 
@@ -55,6 +54,17 @@ at https://www.gnu.org/software/classpath/license.html.
 (let [total-migrations (-> mig/config :migrations count)]
     (repl/rollback mig/config total-migrations))
 ```
+
+# Running tests
+See project.clj test-selectors section
+```lein test [:all/:integration/:now]
+```
+- no selectors => runs only fast tests excl. integration
+- :integration => slow/db-tests. Define STOCKMON_DB=dbName. (See config/db.clj for defaults)
+- :all runs all tests 
+- use :now to mark and run a specific test
+
+
 
 # DB 
 
