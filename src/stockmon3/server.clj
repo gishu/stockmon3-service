@@ -6,12 +6,13 @@
             [ring.middleware.cors :refer [wrap-cors]]
             [ring.middleware.defaults :refer :all]
             [ring.middleware.json :refer [wrap-json-response wrap-json-body]]
+            [ring.middleware.multipart-params :refer [wrap-multipart-params]]
             [ring.middleware.reload :as reload]
             [ring.util.response :refer :all]
+            [stockmon3.db.account-io :refer [load-account save-account query-pnl-register] :as account-io]
             [stockmon3.domain.account :as account]
-            [stockmon3.utils :refer [money->dbl]]
-            [stockmon3.domain.quotes :refer [load-quotes-map]]
-            [stockmon3.db.account-io :refer [load-account save-account query-pnl-register] :as account-io])
+            [stockmon3.quotes :as quotes]
+            [stockmon3.utils :refer [money->dbl]])
   (:gen-class))
 
 (declare get-account-by-id get-year-from get-account-id-from 
@@ -105,12 +106,6 @@
                             :headers {"Content-Type" "application/json; charset=utf-8"}
                             :body {:error error}}))))
 
-(defn get-quotes [request]
-  (let [symbols (get-in request [:body :symbols])
-        latest-quotes (load-quotes-map)]
-    
-    (response {:quotes
-               (reduce #(assoc %1 %2 (get latest-quotes %2 0)) {} symbols)})))
 
 (defroutes my-routes
 
@@ -119,15 +114,16 @@
   (GET "/accounts/:id/dividends/:year" [] get-dividends)
   (GET "/accounts/:id/holdings" [] get-holdings)
   (POST "/accounts/:id/trades" [] post-trades )
-  (POST "/quotes" [] get-quotes ))
+  (GET "/quotes" [] quotes/get-quotes )
+  (POST "/quotes" [] quotes/post-quotes))
 
 (def app (-> my-routes
              wrap-json-response
              (wrap-json-body {:keywords? true})
              (wrap-defaults  api-defaults)
+             wrap-multipart-params
              (wrap-cors :access-control-allow-origin [#"st3-ui"]
-                        :access-control-allow-methods [:get :post])
-             ))
+                        :access-control-allow-methods [:get :post])))
 
 (defn in-dev? [_]
   (env :dev))
