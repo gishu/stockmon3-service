@@ -3,7 +3,7 @@
 
 (defn get-db-info []
   {:dbtype "postgresql"
-   :dbname (env :stockmon-db)
+   :dbname (or (env :stockmon-db) "devdb")
    :host (or (env :stockmon-db-host) "localhost")
    :port (or (env :stockmon-db-port) 5432)
    :user (or  (env :stockmon-db-user) "gishu")
