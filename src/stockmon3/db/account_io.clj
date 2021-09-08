@@ -9,7 +9,7 @@
             [stockmon3.utils.db :refer [mapSqlToTimeTypes]])
   (:import java.time.Instant java.time.LocalDate java.math.BigDecimal))
 
-(declare save-holdings save-new-holdings save-gains load-holdings load-gains)
+(declare save-holdings save-new-holdings save-gains load-holdings load-gains get-financial-year)
 
 (defn save-account [an-account]
 
@@ -198,3 +198,24 @@
                   :notes notes
                   }
                  )))))
+(defn get-years-for
+  "list of all financial years for which a trade exists for this account"
+  [account-id]
+  (let [db (get-db-conn)
+        {start :first_trade end :last_trade} (->>
+                                              (jdbc/execute-one! db ["select min(trade_date) as first_trade, max(trade_date) as last_trade from st3.trades where account_id = ?"
+                                                                     account-id])
+                                              mapSqlToTimeTypes)
+        start-year (get-financial-year start)
+        end-year (get-financial-year end)]
+    (->> (range start-year (inc end-year))
+         reverse)
+    ))
+
+(defn- get-financial-year 
+  "get financial/accounting year for India for the input date"
+  [a-date]
+  (let [the-year (.getYear a-date)]
+    (if (.isBefore a-date (LocalDate/of the-year 4 1))
+      (dec the-year)
+      the-year)))

@@ -9,7 +9,7 @@
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
             [ring.middleware.reload :as reload]
             [ring.util.response :refer :all]
-            [stockmon3.db.account-io :refer [load-account save-account query-pnl-register] :as account-io]
+            [stockmon3.db.account-io :refer [load-account save-account query-pnl-register get-years-for] :as account-io]
             [stockmon3.domain.account :as account]
             [stockmon3.domain.trade :refer [make-dividend]]
             [stockmon3.quotes :as quotes]
@@ -126,6 +126,18 @@
                             :headers {"Content-Type" "application/json; charset=utf-8"}
                             :body {:error error}}))))
 
+(defn get-years-list [request]
+  (try
+    (let [account-id (get-account-id-from request)]
+
+      (response  {:data (get-years-for account-id)}))
+    (catch NumberFormatException _
+      (bad-request "Error: Account id must be numeric."))
+    (catch Exception ex  (let [error (.getMessage ex)]
+                           (prn error)
+                           {:status 500
+                            :headers {"Content-Type" "application/json; charset=utf-8"}
+                            :body {:error error}}))))
 
 (defroutes my-routes
 
@@ -135,6 +147,7 @@
   (GET "/accounts/:id/holdings" [] get-holdings)
   (POST "/accounts/:id/trades" [] post-trades )
   (POST "/accounts/:id/divs" [] post-dividends)
+  (GET "/accounts/:id/years" [] get-years-list)
 
   (GET "/quotes" [] quotes/get-quotes )
   (POST "/quotes" [] quotes/post-quotes))

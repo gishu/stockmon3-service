@@ -11,9 +11,12 @@
         (-> request
             (get-in [:params :symbols])
             (str/split #","))
-        latest-quotes (load-quotes-map)]
+        latest-quotes (load-quotes-map)
+        default-quote {:type "EQ" :price 0}]
     (response {:quotes
-               (reduce #(assoc %1 %2 (get latest-quotes %2 0)) {} symbols)})))
+               (reduce #(assoc %1 %2 (get latest-quotes %2 default-quote)) 
+                       {} 
+                       symbols)})))
 
 (defn post-quotes [request]
   (let [srcFile (get-in request [:params :quotes :tempfile])
