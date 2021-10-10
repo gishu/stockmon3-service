@@ -1,4 +1,4 @@
-FROM postgres:12
+FROM postgres:14
 
 LABEL maintainer="gishu@hotmail.com"
 

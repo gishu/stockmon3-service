@@ -4,7 +4,7 @@
   :license {:name "EPL-2.0"
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.10.1"]
-                 [org.postgresql/postgresql "42.1.1"]
+                 [org.postgresql/postgresql "42.2.24"]
                  [ragtime "0.8.0"]
                  [seancorfield/next.jdbc "1.1.613"]
                  [clojurewerkz/money "1.10.0"]
