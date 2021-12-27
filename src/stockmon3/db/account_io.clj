@@ -167,7 +167,7 @@
 
 (defn get-cagr [gain]
   (let [{:keys [cost_price sale_price duration_days]} gain]
-    (if (= BigDecimal/ZERO cost_price)
+    (if (or (= BigDecimal/ZERO cost_price) (= 0 duration_days))
       BigDecimal/ZERO
       (->
        (.divide sale_price cost_price 4 BigDecimal/ROUND_HALF_EVEN)
