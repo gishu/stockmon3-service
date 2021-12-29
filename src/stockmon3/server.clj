@@ -19,6 +19,16 @@
 (declare get-account-by-id get-year-from get-account-id-from 
          post-trade)
 
+(defn get-accounts
+  "HTTP handler to fetch list of accounts"
+  [request]
+  (try
+    (let [accounts-list (account-io/get-accounts)]
+      (response accounts-list))
+    (catch Exception e
+      (bad-request (.getMessage e))))
+  )
+
 (defn get-account [request]
 
   (try
@@ -141,7 +151,8 @@
 
 (defroutes my-routes
 
-  (GET "/accounts/:id" []  get-account)
+  (GET "/accounts" [] get-accounts)
+  (GET "/accounts/:id" [] get-account)
   (GET "/accounts/:id/gains/:year" [] get-gains)
   (GET "/accounts/:id/dividends/:year" [] get-dividends)
   (GET "/accounts/:id/holdings" [] get-holdings)

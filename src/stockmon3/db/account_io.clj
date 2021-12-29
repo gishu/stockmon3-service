@@ -219,3 +219,9 @@
     (if (.isBefore a-date (LocalDate/of the-year 4 1))
       (dec the-year)
       the-year)))
+
+(defn get-accounts
+  "get list of all accounts"
+  []
+  (let [db (get-db-conn)]
+    (jdbc/execute! db ["SELECT id, description as desc FROM st3.accounts ORDER BY id DESC"])))
