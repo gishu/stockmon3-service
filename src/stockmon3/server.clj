@@ -19,6 +19,25 @@
 (declare get-account-by-id get-year-from get-account-id-from 
          post-trade)
 
+
+(defn post-account
+  "Creates a new account"
+  [request]
+  (try
+    (let [account (get-in request [:body :account])
+          {:keys [name description]} account
+          created-id (-> (account/make-account name description)
+                         save-account
+                         :id)]
+
+      (created (str "accounts/" created-id)))
+
+    (catch Exception ex (let [error (.getMessage ex)]
+                          (prn error)
+                          {:status  500
+                           :headers {"Content-Type" "application/json; charset=utf-8"}
+                           :body    {:error error}}))))
+
 (defn get-accounts
   "HTTP handler to fetch list of accounts"
   [request]
@@ -67,22 +86,22 @@
     (catch IllegalArgumentException ae
       (bad-request (.getMessage ae)))))
 
-(defn post-trades [request]
-  (try
-    (let [account-id (get-account-id-from request)
-          account (load-account account-id)
-          trades (get-in request [:body :trades])]
+  (defn post-trades [request]
+    (try
+      (let [account-id (get-account-id-from request)
+            account (load-account account-id)
+            trades (get-in request [:body :trades])]
 
-      (account/apply-trades account trades)
-      (save-account account)
+        (account/apply-trades account trades)
+        (save-account account)
 
-      (response {:result "OK"}))
+        (response {:result "OK"}))
 
-    (catch Exception ex  (let [error (.getMessage ex)]
-                           (prn error)
-                           {:status 500
-                            :headers {"Content-Type" "application/json; charset=utf-8"}
-                            :body {:error error}}))))
+      (catch Exception ex  (let [error (.getMessage ex)]
+                             (prn error)
+                             {:status 500
+                              :headers {"Content-Type" "application/json; charset=utf-8"}
+                              :body {:error error}}))))
 
 (defn post-dividends [request]
   (try
@@ -152,7 +171,9 @@
 (defroutes my-routes
 
   (GET "/accounts" [] get-accounts)
+  (POST "/accounts" [] post-account )
   (GET "/accounts/:id" [] get-account)
+
   (GET "/accounts/:id/gains/:year" [] get-gains)
   (GET "/accounts/:id/dividends/:year" [] get-dividends)
   (GET "/accounts/:id/holdings" [] get-holdings)
