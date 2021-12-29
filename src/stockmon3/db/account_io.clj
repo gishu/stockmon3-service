@@ -203,14 +203,18 @@
   [account-id]
   (let [db (get-db-conn)
         {start :first_trade end :last_trade} (->>
-                                              (jdbc/execute-one! db ["select min(trade_date) as first_trade, max(trade_date) as last_trade from st3.trades where account_id = ?"
-                                                                     account-id])
-                                              mapSqlToTimeTypes)
-        start-year (get-financial-year start)
-        end-year (get-financial-year end)]
-    (->> (range start-year (inc end-year))
-         reverse)
-    ))
+                                               (jdbc/execute-one! db ["select min(trade_date) as first_trade, max(trade_date) as last_trade from st3.trades where account_id = ?"
+                                                                      account-id])
+                                               mapSqlToTimeTypes)]
+
+    ; return empty list if there are no trades
+    (if (or start end)
+
+      (let [start-year (get-financial-year start)
+            end-year (get-financial-year end)]
+        (->> (range start-year (inc end-year))
+             reverse))
+      [])))
 
 (defn- get-financial-year 
   "get financial/accounting year for India for the input date"

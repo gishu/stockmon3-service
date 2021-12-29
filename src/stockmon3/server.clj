@@ -43,7 +43,7 @@
   [request]
   (try
     (let [accounts-list (account-io/get-accounts)]
-      (response accounts-list))
+      (response {:data accounts-list}))
     (catch Exception e
       (bad-request (.getMessage e))))
   )
@@ -86,22 +86,22 @@
     (catch IllegalArgumentException ae
       (bad-request (.getMessage ae)))))
 
-  (defn post-trades [request]
-    (try
-      (let [account-id (get-account-id-from request)
-            account (load-account account-id)
-            trades (get-in request [:body :trades])]
+(defn post-trades [request]
+  (try
+    (let [account-id (get-account-id-from request)
+          account (load-account account-id)
+          trades (get-in request [:body :trades])]
 
-        (account/apply-trades account trades)
-        (save-account account)
+      (account/apply-trades account trades)
+      (save-account account)
 
-        (response {:result "OK"}))
+      (response {:result "OK"}))
 
-      (catch Exception ex  (let [error (.getMessage ex)]
-                             (prn error)
-                             {:status 500
-                              :headers {"Content-Type" "application/json; charset=utf-8"}
-                              :body {:error error}}))))
+    (catch Exception ex (let [error (.getMessage ex)]
+                          (prn error)
+                          {:status  500
+                           :headers {"Content-Type" "application/json; charset=utf-8"}
+                           :body    {:error error}}))))
 
 (defn post-dividends [request]
   (try
